@@ -98,6 +98,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .api-status{font-size:11px;padding:4px 8px;border-radius:6px;margin-top:4px;display:inline-block}
 .api-ok{background:#c8e6c9;color:#1b5e20}
 .api-err{background:#ffcdd2;color:#b71c1c}
+.api-warn{background:#fff9c4;color:#f57f17}
 .api-loading{background:#e0e0e0;color:#555}
 
 .empty{text-align:center;padding:32px 16px;color:#888;font-size:14px}
@@ -220,8 +221,10 @@ function showToast(msg) {
 // ---- Controllo stato API ----
 async function checkApi() {
   const el = document.getElementById("apiStatus");
+  el.className = "api-status api-warn";
+  el.textContent = "⏳ Connessione API…";
   try {
-    const r = await fetch(API_URL + "/health", {signal: AbortSignal.timeout(5000)});
+    const r = await fetch(API_URL + "/health", {signal: AbortSignal.timeout(20000)});
     if (r.ok) {
       const d = await r.json();
       apiReady = true;
