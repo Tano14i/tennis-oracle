@@ -19,7 +19,7 @@ from tennis_analysis import (explain_winner, explain_sets, explain_games,
                               explain_aces, explain_tiebreak)
 
 app = Flask(__name__)
-CORS(app)  # permette chiamate da GitHub Pages
+CORS(app)
 
 # ---------------------------------------------------------------------------
 # Caricamento modelli all'avvio (una volta sola)
@@ -37,6 +37,100 @@ except Exception as e:
     print(f"ERRORE caricamento modelli: {e}")
     MODELS_READY = False
 
+# ---------------------------------------------------------------------------
+# Generatore narrativa con Claude API + web search
+# ---------------------------------------------------------------------------
+
+def generate_narrative(p1_name, p2_name, tournament, surface, tour,
+                       round_str, best_of, predictions, p1_stats_resp,
+                       p2_stats_resp, h2h_resp, data_quality):
+    """Genera narrativa giornalistica con Claude API + web search."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+
+        winner_pred = predictions.get("winner", {})
+        prob        = winner_pred.get("prob", 0.5)
+        favorite    = p1_name if prob >= 0.5 else p2_name
+        underdog    = p2_name if prob >= 0.5 else p1_name
+        win_pct     = round(max(prob, 1 - prob) * 100)
+
+        # Mercati rilevanti
+        markets_lines = []
+        for mk, pred in predictions.items():
+            if pred.get("show"):
+                markets_lines.append(
+                    f"  - {pred['title']}: {pred['bet_label']} ({pred['bet_prob']:.0f}%)"
+                    f" — confidenza {pred['confidence']}"
+                )
+
+        # H2H
+        h2h_total = h2h_resp.get("total", 0)
+        h2h_str   = (f"{p1_name} {h2h_resp['p1_wins']}-{h2h_resp['p2_wins']} {p2_name}"
+                     if h2h_total > 0 else "nessun precedente")
+
+        surf_names = {"Hard": "cemento", "Clay": "terra battuta", "Grass": "erba"}
+        surf_it    = surf_names.get(surface, surface)
+
+        prompt = f"""Sei un analista sportivo esperto di tennis. Hai a disposizione dati ML e puoi cercare sul web informazioni recenti.
+
+PARTITA: {p1_name} vs {p2_name}
+TORNEO: {tournament or tour + ' Tour'} | {surf_it} | {round_str} | Best of {best_of}
+
+DATI ML:
+- Favorito: {favorite} ({win_pct}% probabilità)
+- {p1_name}: win rate {p1_stats_resp['win_rate']:.0f}%, forma recente {p1_stats_resp['recent_wr']:.0f}%, streak {p1_stats_resp['streak']:+d}
+- {p2_name}: win rate {p2_stats_resp['win_rate']:.0f}%, forma recente {p2_stats_resp['recent_wr']:.0f}%, streak {p2_stats_resp['streak']:+d}
+- H2H: {h2h_str}
+- Qualità dati: {data_quality}
+
+PREVISIONI MERCATI:
+{chr(10).join(markets_lines) if markets_lines else "  (nessun mercato affidabile)"}
+
+Usa web_search per trovare informazioni recenti su entrambi i giocatori: forma 2026, infortuni, risultati recenti, dati sul torneo specificato.
+
+Poi genera un'analisi in italiano con ESATTAMENTE questo formato (mantieni le emoji):
+
+🎾 {p1_name} vs {p2_name} — [Torneo e Round]
+🏆 Favorito: [nome] — [frase narrativa vivace, 1-2 righe]
+📊 Analisi:
+[2-4 righe: forma recente e risultati specifici di entrambi, infortuni se presenti, contesto torneo]
+[1-2 righe: H2H e considerazioni tattiche]
+💰 Scommessa principale: [bet label dal dato ML più affidabile]
+Perché: [ragionamento 2-3 righe concreto basato su dati reali + ML]
+Confidenza: [ALTA/MEDIA/BASSA]
+💡 Scommessa alternativa: [seconda opzione interessante]
+Perché: [1-2 righe]
+⚠️ Attenzione: [1 variabile di rischio concreta da monitorare]
+
+Tono: giornalistico, vivace, diretto. Dati reali > speculazione. Se non trovi dati recenti su un giocatore, dillo chiaramente."""
+
+        resp = client.messages.create(
+            model="claude-opus-4-5",
+            max_tokens=1200,
+            tools=[{
+                "type": "web_search_20250305",
+                "name": "web_search",
+                "max_uses": 4
+            }],
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        narrative = ""
+        for block in resp.content:
+            if hasattr(block, "text"):
+                narrative += block.text
+
+        return narrative.strip() if narrative.strip() else None
+
+    except Exception as e:
+        print(f"Narrative generation failed: {e}")
+        return None
+
 
 # ---------------------------------------------------------------------------
 # Endpoints
@@ -44,7 +138,12 @@ except Exception as e:
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok", "models_ready": MODELS_READY, "players": len(player_stats) if MODELS_READY else 0})
+    return jsonify({
+        "status": "ok",
+        "models_ready": MODELS_READY,
+        "players": len(player_stats) if MODELS_READY else 0,
+        "narrative_enabled": bool(os.environ.get("ANTHROPIC_API_KEY"))
+    })
 
 
 @app.route("/analyze", methods=["POST"])
@@ -59,7 +158,7 @@ def _analyze_inner():
     if not MODELS_READY:
         return jsonify({"error": "Modelli non caricati"}), 503
 
-    data = request.get_json(force=True)
+    data       = request.get_json(force=True)
     p1_name    = data.get("p1", "").strip()
     p2_name    = data.get("p2", "").strip()
     surface    = data.get("surface", "Hard")
@@ -71,7 +170,7 @@ def _analyze_inner():
     if not p1_name or not p2_name:
         return jsonify({"error": "Nomi giocatori mancanti"}), 400
 
-    # Rileva Grand Slam dal nome torneo
+    # Rileva Grand Slam
     GRAND_SLAMS = ("australian open", "roland garros", "french open", "wimbledon", "us open")
     is_slam = any(gs in tournament for gs in GRAND_SLAMS)
     if tour == "WTA":
@@ -82,12 +181,8 @@ def _analyze_inner():
         best_of = 3
 
     # Risolvi ID giocatori
-    p1_id = find_player_id(p1_name, name_lookup)
-    p2_id = find_player_id(p2_name, name_lookup)
-
-    # Se non trovati, usa ID fittizi (predizioni degraded ma funzionanti)
-    p1_id = p1_id if p1_id else -1
-    p2_id = p2_id if p2_id else -2
+    p1_id = find_player_id(p1_name, name_lookup) or -1
+    p2_id = find_player_id(p2_name, name_lookup) or -2
 
     p1_found = p1_id != -1
     p2_found = p2_id != -2
@@ -112,12 +207,10 @@ def _analyze_inner():
         data_quality = "media" if data_quality == "alta" else data_quality
 
     surf_key_check = f"n_{surface.lower()}"
-    p1_surf_n = surface_stats.get(p1_id, {}).get(surf_key_check, 0)
-    p2_surf_n = surface_stats.get(p2_id, {}).get(surf_key_check, 0)
-    if p1_found and p1_surf_n < 5:
-        quality_warnings.append(f"{p1_name} ha pochi match su {surface} ({p1_surf_n})")
-    if p2_found and p2_surf_n < 5:
-        quality_warnings.append(f"{p2_name} ha pochi match su {surface} ({p2_surf_n})")
+    if p1_found and surface_stats.get(p1_id, {}).get(surf_key_check, 0) < 5:
+        quality_warnings.append(f"{p1_name} ha pochi match su {surface}")
+    if p2_found and surface_stats.get(p2_id, {}).get(surf_key_check, 0) < 5:
+        quality_warnings.append(f"{p2_name} ha pochi match su {surface}")
 
     try:
         predictions, h2h, h2h_surf = predict_match(
@@ -127,7 +220,7 @@ def _analyze_inner():
     except Exception as e:
         return jsonify({"error": f"Errore predizione: {str(e)}"}), 500
 
-    # Statistiche giocatori per il frontend
+    # Statistiche giocatori
     p1_stats = player_stats.get(p1_id, {})
     p2_stats = player_stats.get(p2_id, {})
     p1_surf  = surface_stats.get(p1_id, {})
@@ -136,52 +229,39 @@ def _analyze_inner():
 
     def pct(v): return round(float(v) * 100, 1)
 
-    response = {
-        "p1_name": p1_name,
-        "p2_name": p2_name,
-        "surface": surface,
-        "tour": tour,
-        "round": round_str,
-        "best_of": best_of,
-        "p1_found": p1_found,
-        "p2_found": p2_found,
-        "p1_stats": {
-            "win_rate":    pct(p1_stats.get("p_win_rate", 0.5)),
-            "recent_wr":   pct(p1_stats.get("p_recent_wr", p1_stats.get("p_win_rate", 0.5))),
-            "streak":      p1_stats.get("p_streak", 0),
-            "surf_wr":     pct(p1_surf.get(surf_key, 0.5)),
-            "aces_avg":    round(p1_stats.get("p_aces_avg", 0), 1),
-            "matches":     p1_stats.get("p_matches", 0),
-        },
-        "p2_stats": {
-            "win_rate":    pct(p2_stats.get("p_win_rate", 0.5)),
-            "recent_wr":   pct(p2_stats.get("p_recent_wr", p2_stats.get("p_win_rate", 0.5))),
-            "streak":      p2_stats.get("p_streak", 0),
-            "surf_wr":     pct(p2_surf.get(surf_key, 0.5)),
-            "aces_avg":    round(p2_stats.get("p_aces_avg", 0), 1),
-            "matches":     p2_stats.get("p_matches", 0),
-        },
-        "h2h": {
-            "total":       h2h.get("h2h_total", 0),
-            "p1_wins":     h2h.get("h2h_p1_wins", 0),
-            "p2_wins":     h2h.get("h2h_total", 0) - h2h.get("h2h_p1_wins", 0),
-        },
-        "markets": {},
-        "data_quality": data_quality,
-        "quality_warnings": quality_warnings,
-        "is_slam": is_slam,
+    p1_stats_resp = {
+        "win_rate":  pct(p1_stats.get("p_win_rate", 0.5)),
+        "recent_wr": pct(p1_stats.get("p_recent_wr", p1_stats.get("p_win_rate", 0.5))),
+        "streak":    p1_stats.get("p_streak", 0),
+        "surf_wr":   pct(p1_surf.get(surf_key, 0.5)),
+        "aces_avg":  round(p1_stats.get("p_aces_avg", 0), 1),
+        "matches":   p1_stats.get("p_matches", 0),
+    }
+    p2_stats_resp = {
+        "win_rate":  pct(p2_stats.get("p_win_rate", 0.5)),
+        "recent_wr": pct(p2_stats.get("p_recent_wr", p2_stats.get("p_win_rate", 0.5))),
+        "streak":    p2_stats.get("p_streak", 0),
+        "surf_wr":   pct(p2_surf.get(surf_key, 0.5)),
+        "aces_avg":  round(p2_stats.get("p_aces_avg", 0), 1),
+        "matches":   p2_stats.get("p_matches", 0),
+    }
+    h2h_resp = {
+        "total":   h2h.get("h2h_total", 0),
+        "p1_wins": h2h.get("h2h_p1_wins", 0),
+        "p2_wins": h2h.get("h2h_total", 0) - h2h.get("h2h_p1_wins", 0),
     }
 
     market_labels = {
-        "winner":     {"title": "Winner",           "yes": f"{p1_name} vince",              "no": f"{p2_name} vince"},
-        "both_set":   {"title": "Entrambi vincono un set", "yes": "Sì",                     "no": "No — vittoria netta"},
-        "games_over": {"title": "Games Over/Under 22.5",   "yes": "Over 22.5",              "no": "Under 22.5"},
-        "aces_over":  {"title": "Aces Over/Under 10.5",    "yes": "Over 10.5",              "no": "Under 10.5"},
-        "sets_over":  {"title": "Set Over/Under 2.5",      "yes": "Over 2.5 set",           "no": "Under 2.5 set"},
-        "tiebreak":   {"title": "Tiebreak (almeno 1)",     "yes": "Sì — almeno 1 tiebreak", "no": "No tiebreak"},
+        "winner":     {"title": "Winner",                    "yes": f"{p1_name} vince",      "no": f"{p2_name} vince"},
+        "both_set":   {"title": "Entrambi vincono un set",   "yes": "Sì",                    "no": "No — vittoria netta"},
+        "games_over": {"title": "Games Over/Under 22.5",     "yes": "Over 22.5",             "no": "Under 22.5"},
+        "aces_over":  {"title": "Aces Over/Under 10.5",      "yes": "Over 10.5",             "no": "Under 10.5"},
+        "sets_over":  {"title": "Set Over/Under 2.5",        "yes": "Over 2.5 set",          "no": "Under 2.5 set"},
+        "tiebreak":   {"title": "Tiebreak (almeno 1)",       "yes": "Sì — almeno 1 tiebreak","no": "No tiebreak"},
     }
 
     h2h_surf = get_h2h_on_surface(df_history, p1_id, p2_id, surface)
+    markets  = {}
 
     for market, pred in predictions.items():
         prob     = pred.get("prob", 0.5)
@@ -191,11 +271,9 @@ def _analyze_inner():
         labels   = market_labels.get(market, {"title": market, "yes": "Sì", "no": "No"})
 
         if prob >= 0.5:
-            bet_label = labels["yes"]
-            bet_prob  = prob_pct
+            bet_label, bet_prob = labels["yes"], prob_pct
         else:
-            bet_label = labels["no"]
-            bet_prob  = round((1 - prob) * 100, 1)
+            bet_label, bet_prob = labels["no"], round((1 - prob) * 100, 1)
 
         # Degrada confidenza se dati scarsi
         if data_quality == "bassa" and conf != "alta":
@@ -203,13 +281,12 @@ def _analyze_inner():
         elif data_quality == "media" and conf == "alta" and abs(prob - 0.5) < 0.20:
             conf = "media"
 
-        # Motivazioni
+        # Motivazioni brevi (bullet)
         if market == "winner":
             reasons = explain_winner(p1_name, p2_name, p1_stats, p2_stats,
                                      p1_surf, p2_surf, surface, h2h, h2h_surf, prob)
         elif market in ("sets_over", "both_set"):
-            reasons = explain_sets(p1_name, p2_name, p1_stats, p2_stats,
-                                   surface, best_of, prob)
+            reasons = explain_sets(p1_name, p2_name, p1_stats, p2_stats, surface, best_of, prob)
         elif market == "games_over":
             reasons = explain_games(p1_name, p2_name, p1_stats, p2_stats, surface, prob)
         elif market == "aces_over":
@@ -219,11 +296,10 @@ def _analyze_inner():
         else:
             reasons = []
 
-        # Bet secondaria (la direzione opposta)
         alt_label = labels["no"] if prob >= 0.5 else labels["yes"]
         alt_prob  = round((1 - prob) * 100, 1) if prob >= 0.5 else prob_pct
 
-        response["markets"][market] = {
+        markets[market] = {
             "title":      labels["title"],
             "prob":       round(prob, 3),
             "prob_pct":   prob_pct,
@@ -237,7 +313,30 @@ def _analyze_inner():
             "reasons":    reasons[:3],
         }
 
-    return jsonify(response)
+    # Narrativa giornalistica (Claude API + web search)
+    narrative = generate_narrative(
+        p1_name, p2_name, tournament, surface, tour, round_str, best_of,
+        markets, p1_stats_resp, p2_stats_resp, h2h_resp, data_quality
+    )
+
+    return jsonify({
+        "p1_name":          p1_name,
+        "p2_name":          p2_name,
+        "surface":          surface,
+        "tour":             tour,
+        "round":            round_str,
+        "best_of":          best_of,
+        "is_slam":          is_slam,
+        "p1_found":         p1_found,
+        "p2_found":         p2_found,
+        "p1_stats":         p1_stats_resp,
+        "p2_stats":         p2_stats_resp,
+        "h2h":              h2h_resp,
+        "markets":          markets,
+        "data_quality":     data_quality,
+        "quality_warnings": quality_warnings,
+        "narrative":        narrative,
+    })
 
 
 # ---------------------------------------------------------------------------
