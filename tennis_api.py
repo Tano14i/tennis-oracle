@@ -15,6 +15,8 @@ sys.path.insert(0, BASE_DIR)
 
 from tennis_dataset import find_player_id, get_h2h, get_h2h_on_surface
 from tennis_models import predict_match, MODELS_DIR, RELIABLE_MARKETS
+from tennis_analysis import (explain_winner, explain_sets, explain_games,
+                              explain_aces, explain_tiebreak)
 
 app = Flask(__name__)
 CORS(app)  # permette chiamate da GitHub Pages

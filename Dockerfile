@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Codice e modelli
-COPY tennis_api.py tennis_dataset.py tennis_models.py tennis_config.py ./
+COPY tennis_api.py tennis_dataset.py tennis_models.py tennis_config.py tennis_analysis.py ./
 COPY models/ ./models/
 
 # HF Spaces usa porta 7860
