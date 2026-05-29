@@ -61,12 +61,14 @@ def generate_narrative(p1_name, p2_name, tournament, surface, tour,
 
         # Mercati rilevanti
         markets_lines = []
+        markets_lines_objs = []
         for mk, pred in predictions.items():
             if pred.get("show"):
                 markets_lines.append(
                     f"  - {pred['title']}: {pred['bet_label']} ({pred['bet_prob']:.0f}%)"
                     f" — confidenza {pred['confidence']}"
                 )
+                markets_lines_objs.append(pred)
 
         # H2H
         h2h_total = h2h_resp.get("total", 0)
@@ -76,47 +78,28 @@ def generate_narrative(p1_name, p2_name, tournament, surface, tour,
         surf_names = {"Hard": "cemento", "Clay": "terra battuta", "Grass": "erba"}
         surf_it    = surf_names.get(surface, surface)
 
-        prompt = f"""Sei un analista sportivo esperto di tennis. Hai a disposizione dati ML e puoi cercare sul web informazioni recenti.
+        prompt = f"""Sei un analista sportivo tennis. Genera un'analisi in italiano basata sui dati ML forniti.
 
-PARTITA: {p1_name} vs {p2_name}
-TORNEO: {tournament or tour + ' Tour'} | {surf_it} | {round_str} | Best of {best_of}
+PARTITA: {p1_name} vs {p2_name} | {tournament or tour} | {surf_it} | {round_str} | Bo{best_of}
+FAVORITO ML: {favorite} {win_pct}% | H2H: {h2h_str}
+{p1_name}: wr {p1_stats_resp['win_rate']:.0f}% recente {p1_stats_resp['recent_wr']:.0f}% streak {p1_stats_resp['streak']:+d}
+{p2_name}: wr {p2_stats_resp['win_rate']:.0f}% recente {p2_stats_resp['recent_wr']:.0f}% streak {p2_stats_resp['streak']:+d}
+MERCATI: {" | ".join(f"{m['bet_label']} {m['bet_prob']:.0f}% ({m['confidence']})" for m in markets_lines_objs)}
 
-DATI ML:
-- Favorito: {favorite} ({win_pct}% probabilità)
-- {p1_name}: win rate {p1_stats_resp['win_rate']:.0f}%, forma recente {p1_stats_resp['recent_wr']:.0f}%, streak {p1_stats_resp['streak']:+d}
-- {p2_name}: win rate {p2_stats_resp['win_rate']:.0f}%, forma recente {p2_stats_resp['recent_wr']:.0f}%, streak {p2_stats_resp['streak']:+d}
-- H2H: {h2h_str}
-- Qualità dati: {data_quality}
-
-PREVISIONI MERCATI:
-{chr(10).join(markets_lines) if markets_lines else "  (nessun mercato affidabile)"}
-
-Usa web_search per trovare informazioni recenti su entrambi i giocatori: forma 2026, infortuni, risultati recenti, dati sul torneo specificato.
-
-Poi genera un'analisi in italiano con ESATTAMENTE questo formato (mantieni le emoji):
-
-🎾 {p1_name} vs {p2_name} — [Torneo e Round]
-🏆 Favorito: [nome] — [frase narrativa vivace, 1-2 righe]
-📊 Analisi:
-[2-4 righe: forma recente e risultati specifici di entrambi, infortuni se presenti, contesto torneo]
-[1-2 righe: H2H e considerazioni tattiche]
-💰 Scommessa principale: [bet label dal dato ML più affidabile]
-Perché: [ragionamento 2-3 righe concreto basato su dati reali + ML]
+Formato ESATTO (mantieni emoji e struttura):
+🎾 {p1_name} vs {p2_name} — [torneo round]
+🏆 Favorito: [nome] — [frase vivace 1 riga sul perché]
+📊 Analisi: [2-3 righe su forma, superfice, tattica, H2H]
+💰 Scommessa principale: [bet]
+Perché: [2 righe ragionamento]
 Confidenza: [ALTA/MEDIA/BASSA]
-💡 Scommessa alternativa: [seconda opzione interessante]
-Perché: [1-2 righe]
-⚠️ Attenzione: [1 variabile di rischio concreta da monitorare]
-
-Tono: giornalistico, vivace, diretto. Dati reali > speculazione. Se non trovi dati recenti su un giocatore, dillo chiaramente."""
+💡 Scommessa alternativa: [bet secondario]
+Perché: [1 riga]
+⚠️ Attenzione: [1 variabile di rischio]"""
 
         resp = client.messages.create(
-            model="claude-opus-4-5",
-            max_tokens=1200,
-            tools=[{
-                "type": "web_search_20250305",
-                "name": "web_search",
-                "max_uses": 4
-            }],
+            model="claude-haiku-4-5",
+            max_tokens=1000,
             messages=[{"role": "user", "content": prompt}]
         )
 
