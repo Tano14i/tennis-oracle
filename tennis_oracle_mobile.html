@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Tennis Oracle</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh;padding-bottom:80px}
+
+.header{background:#1a1a1a;color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header h1{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+.header-sub{font-size:11px;color:#888;margin-top:1px}
+.btn-refresh{background:rgba(255,255,255,0.1);border:none;color:#fff;padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.btn-refresh:active{background:rgba(255,255,255,0.2)}
+
+.filters{padding:12px 16px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;background:#fff;border-bottom:1px solid #eee;position:sticky;top:57px;z-index:99}
+.filters::-webkit-scrollbar{display:none}
+.filters select{padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff;flex-shrink:0;cursor:pointer;-webkit-appearance:none;appearance:none;padding-right:24px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+.count-pill{background:#f0f0f0;padding:6px 12px;border-radius:8px;font-size:12px;color:#666;white-space:nowrap;flex-shrink:0;display:flex;align-items:center}
+
+.match-list{padding:12px 16px;display:flex;flex-direction:column;gap:6px}
+.match-card{display:flex;align-items:center;gap:10px;padding:14px 14px;background:#fff;border:1.5px solid #e5e5e5;border-radius:12px;cursor:pointer;transition:border-color .1s;user-select:none;-webkit-user-select:none}
+.match-card:active{background:#f8f8f8;border-color:#999}
+.match-card.selected{border-color:#1a1a1a;background:#f8f8f8}
+.surf-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.clay{background:#c2703a}.grass{background:#3b6d11}.hard{background:#185fa5}
+.badge{font-size:10px;font-weight:600;padding:3px 7px;border-radius:4px;letter-spacing:.3px;flex-shrink:0}
+.atp{background:#e6f1fb;color:#0c447c}.wta{background:#fbeaf0;color:#72243e}.itf{background:#f1efe8;color:#444441}.cha{background:#faeeda;color:#633806}
+.match-names{flex:1;min-width:0}
+.match-players{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.match-vs{font-weight:400;color:#888}
+.match-info{font-size:11px;color:#888;margin-top:2px}
+.match-time{font-size:12px;color:#888;flex-shrink:0;text-align:right}
+
+.pager{display:flex;gap:8px;justify-content:center;padding:8px 16px;align-items:center}
+.pager button{padding:8px 18px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;font-size:13px}
+.pager button:disabled{opacity:.4}
+.pager span{font-size:13px;color:#888}
+
+.action-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid #eee;padding:12px 16px;display:flex;gap:8px;z-index:100}
+.btn-analyze{flex:1;padding:14px;background:#1a1a1a;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-analyze:disabled{background:#ccc;cursor:not-allowed}
+.btn-analyze:active:not(:disabled){background:#333}
+.btn-analyze.loading{background:#555}
+
+.content{padding:16px}
+
+/* Pannello risultati analisi */
+.analysis-panel{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px;margin-bottom:14px;display:none}
+.analysis-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.analysis-title{font-size:15px;font-weight:600}
+.analysis-close{background:none;border:none;font-size:18px;cursor:pointer;color:#888;padding:4px}
+.analysis-meta{font-size:12px;color:#888;margin-bottom:14px}
+.analysis-warning{background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 12px;font-size:12px;color:#7a5c00;margin-bottom:12px}
+
+.stats-row{display:flex;gap:8px;margin-bottom:14px}
+.stat-card{flex:1;background:#f8f8f8;border-radius:10px;padding:10px 12px;min-width:0}
+.stat-name{font-size:11px;font-weight:600;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-line{font-size:11px;color:#555;margin-bottom:3px;display:flex;justify-content:space-between}
+.stat-val{font-weight:600;color:#1a1a1a}
+.streak-pos{color:#2e7d32;font-weight:700}
+.streak-neg{color:#c62828;font-weight:700}
+
+.h2h-row{background:#f0f0f0;border-radius:8px;padding:8px 12px;font-size:12px;color:#555;margin-bottom:14px;text-align:center}
+
+.markets-grid{display:flex;flex-direction:column;gap:8px}
+.market-card{border-radius:10px;padding:12px 14px;border:1.5px solid #e5e5e5}
+.market-card.green{border-color:#a5d6a7;background:#f1f8f1}
+.market-card.yellow{border-color:#ffe082;background:#fffbf0}
+.market-card.grey{border-color:#e0e0e0;background:#fafafa;opacity:.7}
+.market-title{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.market-bet{font-size:14px;font-weight:600;margin-bottom:4px}
+.market-meta{font-size:12px;color:#666;display:flex;gap:10px;align-items:center}
+.conf-pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.3px}
+.conf-alta{background:#c8e6c9;color:#1b5e20}
+.conf-media{background:#fff9c4;color:#7a6000}
+.conf-bassa{background:#f5f5f5;color:#888}
+.nobet-label{font-size:13px;color:#aaa;font-style:italic}
+
+.prob-bar-wrap{height:4px;background:#e0e0e0;border-radius:2px;margin-top:6px}
+.prob-bar{height:4px;border-radius:2px;background:#1a1a1a;transition:width .4s}
+
+.manual-form{display:flex;flex-direction:column;gap:8px}
+.manual-form input,.manual-form select{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;background:#fff}
+.manual-form input:focus,.manual-form select:focus{outline:none;border-color:#1a1a1a}
+.row2{display:flex;gap:8px}
+.row2 input,.row2 select{flex:1}
+.step-box{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px;margin-bottom:14px}
+.step-title{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+.btn-add{width:100%;padding:13px;background:#fff;border:1.5px solid #1a1a1a;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
+.btn-add:active{background:#f0f0f0}
+
+.api-status{font-size:11px;padding:4px 8px;border-radius:6px;margin-top:4px;display:inline-block}
+.api-ok{background:#c8e6c9;color:#1b5e20}
+.api-err{background:#ffcdd2;color:#b71c1c}
+.api-loading{background:#e0e0e0;color:#555}
+
+.empty{text-align:center;padding:32px 16px;color:#888;font-size:14px}
+.empty-icon{font-size:32px;margin-bottom:8px}
+.loading{text-align:center;padding:24px;color:#888;font-size:14px}
+.no-results{text-align:center;padding:24px;color:#888;font-size:13px}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:200;white-space:nowrap}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🎾 Tennis Oracle</h1>
+    <div class="header-sub" id="dateLabel">Caricamento...</div>
+  </div>
+  <button class="btn-refresh" onclick="loadSchedule()">🔄 Aggiorna</button>
+</div>
+
+<div class="filters">
+  <select id="fTour" onchange="applyFilters()">
+    <option value="all">Tutti i tour</option>
+    <option value="ATP">ATP</option>
+    <option value="WTA">WTA</option>
+    <option value="Challenger">Challenger</option>
+    <option value="ITF">ITF</option>
+  </select>
+  <select id="fSurf" onchange="applyFilters()">
+    <option value="all">Superficie</option>
+    <option value="Clay">🟤 Terra</option>
+    <option value="Hard">🔵 Cemento</option>
+    <option value="Grass">🟢 Erba</option>
+  </select>
+  <select id="fTournament" onchange="applyFilters()">
+    <option value="all">Torneo</option>
+  </select>
+  <span class="count-pill" id="countLabel">0 partite</span>
+</div>
+
+<div id="matchList" class="match-list">
+  <div class="loading">⏳ Carico partite...</div>
+</div>
+<div id="pager" class="pager"></div>
+
+<div class="content">
+
+  <!-- Pannello analisi ML -->
+  <div class="analysis-panel" id="analysisPanel">
+    <div class="analysis-header">
+      <div class="analysis-title" id="analysisTitle">Analisi</div>
+      <button class="analysis-close" onclick="closeAnalysis()">✕</button>
+    </div>
+    <div class="analysis-meta" id="analysisMeta"></div>
+    <div id="analysisWarning"></div>
+    <div class="stats-row" id="statsRow"></div>
+    <div class="h2h-row" id="h2hRow"></div>
+    <div class="markets-grid" id="marketsGrid"></div>
+    <div style="margin-top:10px;font-size:11px;color:#aaa;text-align:center">Analisi basata su dataset storico Sackmann — ultimi 20 match per giocatore</div>
+  </div>
+
+  <!-- Aggiungi partita manuale -->
+  <div class="step-box">
+    <div class="step-title">➕ Aggiungi partita</div>
+    <div class="manual-form">
+      <div class="row2">
+        <input type="text" id="mP1" placeholder="Giocatore 1">
+        <input type="text" id="mP2" placeholder="Giocatore 2">
+      </div>
+      <div class="row2">
+        <select id="mTour">
+          <option value="ATP">ATP</option>
+          <option value="WTA">WTA</option>
+          <option value="Challenger">Challenger</option>
+          <option value="ITF">ITF</option>
+        </select>
+        <select id="mSurf">
+          <option value="Clay">🟤 Terra</option>
+          <option value="Hard">🔵 Cemento</option>
+          <option value="Grass">🟢 Erba</option>
+        </select>
+      </div>
+      <input type="text" id="mTournament" placeholder="Torneo (es. Roland Garros)">
+      <input type="text" id="mRound" placeholder="Round (es. R1, QF, SF, F)">
+      <button class="btn-add" onclick="addManual()">➕ Aggiungi alla lista</button>
+    </div>
+  </div>
+
+  <!-- Stato API -->
+  <div style="text-align:center;padding-bottom:8px">
+    <span class="api-status api-loading" id="apiStatus">⏳ Connessione API...</span>
+  </div>
+
+</div>
+
+<div class="action-bar">
+  <button class="btn-analyze" id="btnAnalyze" onclick="analyzeSelected()" disabled>
+    ✨ Analizza partita selezionata
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+// URL backend Railway — aggiorna dopo il deploy
+const API_URL = "https://fabio14i-tennis-oracle-api.hf.space";
+
+const PAGE = 8;
+let all = [], filtered = [], selIdx = null, page = 0;
+let apiReady = false;
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2000);
+}
+
+// ---- Controllo stato API ----
+async function checkApi() {
+  const el = document.getElementById("apiStatus");
+  try {
+    const r = await fetch(API_URL + "/health", {signal: AbortSignal.timeout(5000)});
+    if (r.ok) {
+      const d = await r.json();
+      apiReady = true;
+      el.className = "api-status api-ok";
+      el.textContent = "✓ ML attivo — " + d.players + " giocatori";
+    } else throw new Error("HTTP " + r.status);
+  } catch(e) {
+    apiReady = false;
+    el.className = "api-status api-err";
+    el.textContent = "✗ API non raggiungibile";
+  }
+}
+
+// ---- Rilevamento superficie ----
+function detectSurf(text) {
+  const s = text.toLowerCase();
+  if (/clay|roland|paris|barcelona|madrid|rome|monte|foro|amburgo|hamburg|lyon|ginevra|geneva|estoril|bucharest|belgrade/.test(s)) return "Clay";
+  if (/grass|wimbledon|halle|queen|eastbourne|hertogenbosch|nottingham|bad homburg|mallorca/.test(s)) return "Grass";
+  return "Hard";
+}
+
+function getName(c) {
+  return c?.athlete?.displayName || c?.team?.displayName || c?.displayName || "";
+}
+
+const WTA_NAMES = new Set([
+  "swiatek","sabalenka","rybakina","gauff","pegula","keys","navarro","andreeva",
+  "paolini","jabeur","ostapenko","azarenka","kvitova","pliskova","vondrousova",
+  "halep","kerber","kontaveit","badosa","garcia","sakkari","haddad maia","kasatkina",
+  "alexandrova","potapova","samsonova","shnaider","mertens","siegemund","osaka",
+  "fernandez","bencic","krejcikova","muchova","noskova","fruhvirtova",
+  "sorribes","tauson","yastremska","zheng","qinwen","wozniacki","muguruza",
+  "williams","serena","venus","cocciaretto","trevisan","vekic","donna",
+  "liu","claire","bouzas","jessica","galfi","dalma","naomi","elena",
+  "parks","alycia","leylah","udvardy","golubic","viktorija","rakhimova",
+  "cristian","jaqueline","boulter","katie","osorio","camila","putintseva",
+  "jeanjean","leolia","lys","eva","svitolina","elina","sramkova","bucsa",
+  "chwalinska","anisimova","amanda","dayana","ella","seidel","veronika"
+]);
+
+function isWTA(p1, p2) {
+  const check = name => {
+    const n = name.toLowerCase();
+    return [...WTA_NAMES].some(w => n.includes(w));
+  };
+  return check(p1) || check(p2);
+}
+
+// ---- Carica palinsesto ESPN ----
+async function loadSchedule() {
+  const el = document.getElementById("matchList");
+  el.innerHTML = '<div class="loading">⏳ Carico da ESPN...</div>';
+  selIdx = null;
+  document.getElementById("btnAnalyze").disabled = true;
+  closeAnalysis();
+
+  try {
+    const today = new Date();
+    const d = today.toISOString().slice(0,10).replace(/-/g,"");
+    const todayISO = today.toISOString().slice(0,10);
+    document.getElementById("dateLabel").textContent = today.toLocaleDateString("it-IT", {weekday:"long", day:"numeric", month:"long", year:"numeric"});
+
+    const endpoints = [
+      ["https://site.api.espn.com/apis/site/v2/sports/tennis/atp/scoreboard?dates=" + d, "ATP"],
+      ["https://site.api.espn.com/apis/site/v2/sports/tennis/wta/scoreboard?dates=" + d, "WTA"],
+      ["https://site.api.espn.com/apis/site/v2/sports/tennis/atp-challenger/scoreboard?dates=" + d, "Challenger"],
+      ["https://site.api.espn.com/apis/site/v2/sports/tennis/challenger/scoreboard?dates=" + d, "Challenger"],
+      ["https://site.api.espn.com/apis/site/v2/sports/tennis/itf-men/scoreboard?dates=" + d, "ITF"],
+      ["https://site.api.espn.com/apis/site/v2/sports/tennis/itf-women/scoreboard?dates=" + d, "ITF"],
+      ["https://site.api.espn.com/apis/site/v2/sports/tennis/itf/scoreboard?dates=" + d, "ITF"],
+    ];
+
+    const responses = await Promise.allSettled(endpoints.map(([url]) => fetch(url)));
+    const datasets = [];
+    for (let i = 0; i < endpoints.length; i++) {
+      const res = responses[i];
+      const tour = endpoints[i][1];
+      if (res.status === "fulfilled" && res.value.ok) {
+        try { datasets.push([await res.value.json(), tour]); } catch(e) {}
+      }
+    }
+
+    all = [];
+    const seen = new Set();
+    for (const [data, endpointTour] of datasets) {
+      for (const ev of data.events || []) {
+        const tournament = ev.name || "";
+        const surface = detectSurf(tournament);
+        for (const grp of ev.groupings || []) {
+          for (const comp of grp.competitions || []) {
+            if ((comp.date || "").slice(0,10) !== todayISO) continue;
+            const st = comp.status?.type?.state || "";
+            if (!["pre","in"].includes(st)) continue;
+            const comps = comp.competitors || [];
+            if (comps.length < 2) continue;
+            const p1 = getName(comps[0]), p2 = getName(comps[1]);
+            if (!p1 || !p2) continue;
+            const key = [p1,p2].sort().join("|");
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const ro = comp.round || {};
+            const round = typeof ro === "object" ? (ro.displayName || "") : String(ro);
+            let time = "";
+            try {
+              const dt = new Date(comp.date);
+              time = dt.toLocaleTimeString("it-IT", {hour:"2-digit",minute:"2-digit"}) + " UTC";
+            } catch(e) {}
+            let realTour = endpointTour;
+            if (endpointTour === "ATP" && isWTA(p1, p2)) realTour = "WTA";
+            all.push({p1, p2, tournament, surface, tour: realTour, round, time});
+          }
+        }
+      }
+    }
+
+    const tournaments = [...new Set(all.map(m => m.tournament))].sort();
+    const sel = document.getElementById("fTournament");
+    sel.innerHTML = '<option value="all">Tutti i tornei</option>';
+    tournaments.forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t; opt.textContent = t;
+      sel.appendChild(opt);
+    });
+
+    if (all.length === 0) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div>Nessuna partita trovata per oggi.<br>Riprova più tardi o domani mattina.</div>';
+      document.getElementById("countLabel").textContent = "";
+    } else {
+      applyFilters();
+    }
+  } catch(e) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div>Errore di connessione.<br><small>' + e.message + '</small></div>';
+  }
+}
+
+function applyFilters() {
+  const ft = document.getElementById("fTour").value;
+  const fs = document.getElementById("fSurf").value;
+  const ftn = document.getElementById("fTournament").value;
+  filtered = all.filter(m =>
+    (ft === "all" || m.tour === ft) &&
+    (fs === "all" || m.surface === fs) &&
+    (ftn === "all" || m.tournament === ftn)
+  );
+  page = 0; selIdx = null;
+  document.getElementById("btnAnalyze").disabled = true;
+  document.getElementById("countLabel").textContent = filtered.length + " partite";
+  render();
+}
+
+function render() {
+  const el = document.getElementById("matchList");
+  if (!filtered.length) {
+    el.innerHTML = '<div class="no-results">Nessuna partita per questi filtri</div>';
+    document.getElementById("pager").innerHTML = "";
+    return;
+  }
+  const start = page * PAGE, end = Math.min(start + PAGE, filtered.length);
+  const surfClass = {Clay:"clay",Grass:"grass",Hard:"hard"};
+  const tourClass = {ATP:"atp",WTA:"wta",ITF:"itf",Challenger:"cha"};
+  el.innerHTML = filtered.slice(start, end).map((m, i) => {
+    const idx = start + i;
+    const sc = surfClass[m.surface] || "hard";
+    const tc = tourClass[m.tour] || "itf";
+    const sel = idx === selIdx ? " selected" : "";
+    return `<div class="match-card${sel}" onclick="selectMatch(${idx})">
+      <span class="surf-dot ${sc}"></span>
+      <span class="badge ${tc}">${m.tour}</span>
+      <div class="match-names">${m.p1} <span class="match-vs">vs</span> ${m.p2}</div>
+      <span class="match-meta">${m.round || ""}</span>
+      <span class="match-time">${m.time}</span>
+    </div>`;
+  }).join("");
+  const total = Math.ceil(filtered.length / PAGE);
+  document.getElementById("pager").innerHTML = total > 1 ?
+    `<button onclick="goPage(${page-1})" ${page===0?"disabled":""}>← Prec</button>
+     <span>${page+1} / ${total}</span>
+     <button onclick="goPage(${page+1})" ${page>=total-1?"disabled":""}>Succ →</button>` : "";
+}
+
+function goPage(p) { page = p; render(); }
+
+function selectMatch(idx) {
+  selIdx = idx;
+  document.getElementById("btnAnalyze").disabled = false;
+  render();
+  document.getElementById("btnAnalyze").scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
+function addManual() {
+  const p1 = document.getElementById("mP1").value.trim();
+  const p2 = document.getElementById("mP2").value.trim();
+  const tour = document.getElementById("mTour").value;
+  const surface = document.getElementById("mSurf").value;
+  const tournament = document.getElementById("mTournament").value.trim() || tour + " Tournament";
+  const round = document.getElementById("mRound").value.trim() || "R1";
+  if (!p1 || !p2) { showToast("⚠️ Inserisci entrambi i nomi"); return; }
+  all.push({p1, p2, tournament, surface, tour, round, time: ""});
+  const sel = document.getElementById("fTournament");
+  if (![...sel.options].some(o => o.value === tournament)) {
+    const opt = document.createElement("option");
+    opt.value = tournament; opt.textContent = tournament;
+    sel.appendChild(opt);
+  }
+  document.getElementById("mP1").value = "";
+  document.getElementById("mP2").value = "";
+  applyFilters();
+  showToast("✓ " + p1 + " vs " + p2 + " aggiunta");
+}
+
+// ---- Analisi ML ----
+async function analyzeSelected() {
+  if (selIdx === null || !filtered[selIdx]) return;
+  if (!apiReady) {
+    showToast("⚠️ API non raggiungibile");
+    return;
+  }
+
+  const m = filtered[selIdx];
+  const btn = document.getElementById("btnAnalyze");
+  btn.disabled = true;
+  btn.classList.add("loading");
+  btn.textContent = "⏳ Analisi in corso...";
+
+  try {
+    const res = await fetch(API_URL + "/analyze", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        p1: m.p1, p2: m.p2,
+        surface: m.surface, tour: m.tour,
+        round: m.round, best_of: m.tour === "WTA" ? 3 : 3
+      }),
+      signal: AbortSignal.timeout(15000)
+    });
+
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    renderAnalysis(data);
+  } catch(e) {
+    showToast("⚠️ Errore analisi: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove("loading");
+    btn.textContent = "✨ Analizza partita selezionata";
+  }
+}
+
+function renderAnalysis(d) {
+  const surfIcon = {Clay:"🟤",Grass:"🟢",Hard:"🔵"}[d.surface] || "⚪";
+  document.getElementById("analysisTitle").textContent = d.p1_name + " vs " + d.p2_name;
+  document.getElementById("analysisMeta").textContent =
+    surfIcon + " " + d.surface + " · " + d.tour + " · " + d.round + " · Best of " + d.best_of;
+
+  // Warning se giocatori non trovati nel dataset
+  const warn = document.getElementById("analysisWarning");
+  const missing = [];
+  if (!d.p1_found) missing.push(d.p1_name);
+  if (!d.p2_found) missing.push(d.p2_name);
+  if (missing.length > 0) {
+    warn.innerHTML = `<div class="analysis-warning">⚠️ ${missing.join(", ")} non presente nel dataset storico — analisi basata su medie globali</div>`;
+  } else {
+    warn.innerHTML = "";
+  }
+
+  // Statistiche giocatori
+  function streakLabel(s) {
+    if (s > 0) return `<span class="streak-pos">↑${s}W</span>`;
+    if (s < 0) return `<span class="streak-neg">↓${Math.abs(s)}L</span>`;
+    return "<span>—</span>";
+  }
+  document.getElementById("statsRow").innerHTML = [d.p1_name, d.p2_name].map((name, i) => {
+    const st = i === 0 ? d.p1_stats : d.p2_stats;
+    return `<div class="stat-card">
+      <div class="stat-name">${name}</div>
+      <div class="stat-line"><span>Win rate</span><span class="stat-val">${st.win_rate}%</span></div>
+      <div class="stat-line"><span>Ultimi 5</span><span class="stat-val">${st.recent_wr}%</span></div>
+      <div class="stat-line"><span>Streak</span><span>${streakLabel(st.streak)}</span></div>
+      <div class="stat-line"><span>${d.surface}</span><span class="stat-val">${st.surf_wr}%</span></div>
+      <div class="stat-line"><span>Aces/m</span><span class="stat-val">${st.aces_avg}</span></div>
+    </div>`;
+  }).join("");
+
+  // H2H
+  const h = d.h2h;
+  document.getElementById("h2hRow").textContent = h.total > 0
+    ? `H2H: ${d.p1_name} ${h.p1_wins}–${h.p2_wins} ${d.p2_name} (${h.total} precedenti)`
+    : "H2H: Nessun precedente nel dataset";
+
+  // Mercati
+  const order = ["winner", "both_set", "games_over", "aces_over", "sets_over", "tiebreak"];
+  const grid = document.getElementById("marketsGrid");
+  grid.innerHTML = order.map(key => {
+    const mk = d.markets[key];
+    if (!mk) return "";
+    const conf = mk.confidence;
+    const show = mk.show;
+
+    if (!show) return ""; // nasconde mercati sotto baseline
+
+    let cardClass = "grey", confClass = "conf-bassa";
+    if (conf === "alta")  { cardClass = "green";  confClass = "conf-alta"; }
+    if (conf === "media") { cardClass = "yellow"; confClass = "conf-media"; }
+
+    const isNoBet = conf === "bassa" || Math.abs(mk.prob - 0.5) < 0.05;
+    const barWidth = Math.round(Math.abs(mk.bet_prob - 50) * 2); // 0–100
+
+    return `<div class="market-card ${cardClass}">
+      <div class="market-title">${mk.title}</div>
+      ${isNoBet
+        ? `<div class="nobet-label">NO BET — segnale troppo debole (${mk.bet_prob.toFixed(0)}%)</div>`
+        : `<div class="market-bet">${mk.bet_label}</div>
+           <div class="market-meta">
+             <span><strong>${mk.bet_prob.toFixed(0)}%</strong> probabilità</span>
+             <span class="conf-pill ${confClass}">${conf}</span>
+           </div>
+           <div class="prob-bar-wrap"><div class="prob-bar" style="width:${barWidth}%"></div></div>`
+      }
+    </div>`;
+  }).join("");
+
+  const panel = document.getElementById("analysisPanel");
+  panel.style.display = "block";
+  panel.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function closeAnalysis() {
+  document.getElementById("analysisPanel").style.display = "none";
+}
+
+// ---- Init ----
+window.onload = function() {
+  document.getElementById("dateLabel").textContent = new Date().toLocaleDateString("it-IT",
+    {weekday:"long", day:"numeric", month:"long", year:"numeric"});
+  checkApi();
+  loadSchedule();
+};
+
+</script>
+</body>
+</html>
