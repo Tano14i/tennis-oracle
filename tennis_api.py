@@ -136,6 +136,8 @@ def analyze():
         "tiebreak":   {"title": "Tiebreak (almeno 1)",     "yes": "Sì — almeno 1 tiebreak", "no": "No tiebreak"},
     }
 
+    h2h_surf = get_h2h_on_surface(df_history, p1_id, p2_id, surface)
+
     for market, pred in predictions.items():
         prob     = pred.get("prob", 0.5)
         prob_pct = pred.get("prob_pct", 50.0)
@@ -150,15 +152,44 @@ def analyze():
             bet_label = labels["no"]
             bet_prob  = round((1 - prob) * 100, 1)
 
+        # Degrada confidenza se dati scarsi
+        if data_quality == "bassa" and conf != "alta":
+            conf = "bassa"
+        elif data_quality == "media" and conf == "alta" and abs(prob - 0.5) < 0.20:
+            conf = "media"
+
+        # Motivazioni
+        if market == "winner":
+            reasons = explain_winner(p1_name, p2_name, p1_stats, p2_stats,
+                                     p1_surf, p2_surf, surface, h2h, h2h_surf, prob)
+        elif market in ("sets_over", "both_set"):
+            reasons = explain_sets(p1_name, p2_name, p1_stats, p2_stats,
+                                   surface, best_of, prob)
+        elif market == "games_over":
+            reasons = explain_games(p1_name, p2_name, p1_stats, p2_stats, surface, prob)
+        elif market == "aces_over":
+            reasons = explain_aces(p1_name, p2_name, p1_stats, p2_stats, surface, prob)
+        elif market == "tiebreak":
+            reasons = explain_tiebreak(p1_name, p2_name, p1_stats, p2_stats, surface, prob)
+        else:
+            reasons = []
+
+        # Bet secondaria (la direzione opposta)
+        alt_label = labels["no"] if prob >= 0.5 else labels["yes"]
+        alt_prob  = round((1 - prob) * 100, 1) if prob >= 0.5 else prob_pct
+
         response["markets"][market] = {
-            "title":     labels["title"],
-            "prob":      round(prob, 3),
-            "prob_pct":  prob_pct,
-            "bet_label": bet_label,
-            "bet_prob":  bet_prob,
+            "title":      labels["title"],
+            "prob":       round(prob, 3),
+            "prob_pct":   prob_pct,
+            "bet_label":  bet_label,
+            "bet_prob":   bet_prob,
+            "alt_label":  alt_label,
+            "alt_prob":   alt_prob,
             "confidence": conf,
-            "reliable":  reliable,
-            "show":      reliable,
+            "reliable":   reliable,
+            "show":       reliable,
+            "reasons":    reasons[:3],
         }
 
     return jsonify(response)
