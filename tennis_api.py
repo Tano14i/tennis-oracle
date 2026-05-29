@@ -50,21 +50,26 @@ def analyze():
         return jsonify({"error": "Modelli non caricati"}), 503
 
     data = request.get_json(force=True)
-    p1_name = data.get("p1", "").strip()
-    p2_name = data.get("p2", "").strip()
-    surface = data.get("surface", "Hard")
-    tour    = data.get("tour", "ATP")
-    round_str = data.get("round", "R32")
-    best_of = int(data.get("best_of", 3))
+    p1_name    = data.get("p1", "").strip()
+    p2_name    = data.get("p2", "").strip()
+    surface    = data.get("surface", "Hard")
+    tour       = data.get("tour", "ATP")
+    round_str  = data.get("round", "R32")
+    tournament = data.get("tournament", "").lower()
+    best_of    = int(data.get("best_of", 3))
 
     if not p1_name or not p2_name:
         return jsonify({"error": "Nomi giocatori mancanti"}), 400
 
-    # best_of: WTA sempre 3, ATP slam 5
+    # Rileva Grand Slam dal nome torneo
+    GRAND_SLAMS = ("australian open", "roland garros", "french open", "wimbledon", "us open")
+    is_slam = any(gs in tournament for gs in GRAND_SLAMS)
     if tour == "WTA":
         best_of = 3
-    elif round_str in ("F", "SF") and tour == "ATP":
-        best_of = best_of  # lascia come passato
+    elif tour == "ATP" and is_slam:
+        best_of = 5
+    else:
+        best_of = 3
 
     # Risolvi ID giocatori
     p1_id = find_player_id(p1_name, name_lookup)
