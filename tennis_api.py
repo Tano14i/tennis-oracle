@@ -128,8 +128,8 @@ Tono: giornalistico, vivace, diretto. Dati reali > speculazione. Se non trovi da
         return narrative.strip() if narrative.strip() else None
 
     except Exception as e:
-        print(f"Narrative generation failed: {e}")
-        return None
+        print(f"Narrative generation failed: {e}\n{traceback.format_exc()}")
+        return f"[ERRORE NARRATIVA: {str(e)}]"
 
 
 # ---------------------------------------------------------------------------
