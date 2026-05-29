@@ -79,6 +79,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .conf-media{background:#fff9c4;color:#7a6000}
 .conf-bassa{background:#f5f5f5;color:#888}
 .nobet-label{font-size:13px;color:#aaa;font-style:italic}
+.market-reasons{margin-top:8px;display:flex;flex-direction:column;gap:3px}
+.market-reason{font-size:12px;color:#555;line-height:1.4}
 
 .prob-bar-wrap{height:4px;background:#e0e0e0;border-radius:2px;margin-top:6px}
 .prob-bar{height:4px;border-radius:2px;background:#1a1a1a;transition:width .4s}
@@ -470,19 +472,24 @@ async function analyzeSelected() {
 
 function renderAnalysis(d) {
   const surfIcon = {Clay:"🟤",Grass:"🟢",Hard:"🔵"}[d.surface] || "⚪";
+  const slamLabel = d.is_slam ? " · Grand Slam" : "";
   document.getElementById("analysisTitle").textContent = d.p1_name + " vs " + d.p2_name;
   document.getElementById("analysisMeta").textContent =
-    surfIcon + " " + d.surface + " · " + d.tour + " · " + d.round + " · Best of " + d.best_of;
+    surfIcon + " " + d.surface + " · " + d.tour + slamLabel + " · " + d.round + " · Best of " + d.best_of;
 
-  // Warning se giocatori non trovati nel dataset
+  // Warning qualità dati
   const warn = document.getElementById("analysisWarning");
-  const missing = [];
-  if (!d.p1_found) missing.push(d.p1_name);
-  if (!d.p2_found) missing.push(d.p2_name);
-  if (missing.length > 0) {
-    warn.innerHTML = `<div class="analysis-warning">⚠️ ${missing.join(", ")} non presente nel dataset storico — analisi basata su medie globali</div>`;
+  const warnings = d.quality_warnings || [];
+  if (warnings.length > 0) {
+    const qualityColor = d.data_quality === "bassa" ? "#ffcdd2" : "#fff8e1";
+    const qualityBorder = d.data_quality === "bassa" ? "#ef9a9a" : "#ffe082";
+    const qualityText = d.data_quality === "bassa" ? "#b71c1c" : "#7a5c00";
+    warn.innerHTML = `<div class="analysis-warning" style="background:${qualityColor};border-color:${qualityBorder};color:${qualityText}">
+      ⚠️ <strong>Dati ${d.data_quality === "bassa" ? "insufficienti" : "limitati"}:</strong> ${warnings.join(" · ")}
+      <br><small>Le probabilità potrebbero essere meno accurate del solito.</small>
+    </div>`;
   } else {
-    warn.innerHTML = "";
+    warn.innerHTML = `<div style="font-size:11px;color:#2e7d32;margin-bottom:10px">✓ Dati storici completi per entrambi i giocatori</div>`;
   }
 
   // Statistiche giocatori
@@ -525,18 +532,21 @@ function renderAnalysis(d) {
     if (conf === "media") { cardClass = "yellow"; confClass = "conf-media"; }
 
     const isNoBet = conf === "bassa" || Math.abs(mk.prob - 0.5) < 0.05;
-    const barWidth = Math.round(Math.abs(mk.bet_prob - 50) * 2); // 0–100
+    const barWidth = Math.round(Math.abs(mk.bet_prob - 50) * 2);
+    const reasons = (mk.reasons || []).map(r => `<div class="market-reason">• ${r}</div>`).join("");
 
     return `<div class="market-card ${cardClass}">
       <div class="market-title">${mk.title}</div>
       ${isNoBet
-        ? `<div class="nobet-label">NO BET — segnale troppo debole (${mk.bet_prob.toFixed(0)}%)</div>`
+        ? `<div class="nobet-label">NO BET — segnale troppo debole (${mk.bet_prob.toFixed(0)}%)</div>
+           ${reasons ? `<div class="market-reasons">${reasons}</div>` : ""}`
         : `<div class="market-bet">${mk.bet_label}</div>
            <div class="market-meta">
              <span><strong>${mk.bet_prob.toFixed(0)}%</strong> probabilità</span>
              <span class="conf-pill ${confClass}">${conf}</span>
            </div>
-           <div class="prob-bar-wrap"><div class="prob-bar" style="width:${barWidth}%"></div></div>`
+           <div class="prob-bar-wrap"><div class="prob-bar" style="width:${barWidth}%"></div></div>
+           ${reasons ? `<div class="market-reasons">${reasons}</div>` : ""}`
       }
     </div>`;
   }).join("");
