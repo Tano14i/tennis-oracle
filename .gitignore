@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+_deploy_temp/
+*.zip
+.claude/
