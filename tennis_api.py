@@ -77,6 +77,33 @@ def analyze():
     p1_found = p1_id != -1
     p2_found = p2_id != -2
 
+    # Protezioni qualità dati
+    p1_matches = player_stats.get(p1_id, {}).get("p_matches", 0)
+    p2_matches = player_stats.get(p2_id, {}).get("p_matches", 0)
+    MIN_MATCHES = 10
+    data_quality = "alta"
+    quality_warnings = []
+    if not p1_found:
+        quality_warnings.append(f"{p1_name} non trovato nel dataset storico")
+        data_quality = "bassa"
+    elif p1_matches < MIN_MATCHES:
+        quality_warnings.append(f"{p1_name} ha solo {p1_matches} match nel dataset")
+        data_quality = "media" if data_quality == "alta" else data_quality
+    if not p2_found:
+        quality_warnings.append(f"{p2_name} non trovato nel dataset storico")
+        data_quality = "bassa"
+    elif p2_matches < MIN_MATCHES:
+        quality_warnings.append(f"{p2_name} ha solo {p2_matches} match nel dataset")
+        data_quality = "media" if data_quality == "alta" else data_quality
+
+    surf_key_check = f"n_{surface.lower()}"
+    p1_surf_n = surface_stats.get(p1_id, {}).get(surf_key_check, 0)
+    p2_surf_n = surface_stats.get(p2_id, {}).get(surf_key_check, 0)
+    if p1_found and p1_surf_n < 5:
+        quality_warnings.append(f"{p1_name} ha pochi match su {surface} ({p1_surf_n})")
+    if p2_found and p2_surf_n < 5:
+        quality_warnings.append(f"{p2_name} ha pochi match su {surface} ({p2_surf_n})")
+
     try:
         predictions, h2h, h2h_surf = predict_match(
             p1_id, p2_id, surface, "A", round_str, best_of,
@@ -125,6 +152,9 @@ def analyze():
             "p2_wins":     h2h.get("h2h_total", 0) - h2h.get("h2h_p1_wins", 0),
         },
         "markets": {},
+        "data_quality": data_quality,
+        "quality_warnings": quality_warnings,
+        "is_slam": is_slam,
     }
 
     market_labels = {
