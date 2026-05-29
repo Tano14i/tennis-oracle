@@ -5,6 +5,7 @@ Flask REST API per Tennis Oracle — chiamata dalla web app GitHub Pages.
 
 import os
 import sys
+import traceback
 import joblib
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -46,6 +47,13 @@ def health():
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
+    try:
+        return _analyze_inner()
+    except Exception as e:
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+
+
+def _analyze_inner():
     if not MODELS_READY:
         return jsonify({"error": "Modelli non caricati"}), 503
 
