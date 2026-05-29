@@ -84,6 +84,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .market-alt{margin-top:8px;font-size:12px;color:#888;border-top:1px solid #eee;padding-top:6px}
 .alt-prob{font-weight:600;color:#aaa}
 
+.narrative-block{background:#fafafa;border:1px solid #e8e8e8;border-radius:12px;padding:16px;margin-bottom:16px;font-size:14px;line-height:1.7;color:#222;white-space:pre-wrap;word-wrap:break-word}
+.narrative-loading{text-align:center;padding:20px;color:#888;font-size:13px;font-style:italic}
+.narrative-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+
 .prob-bar-wrap{height:4px;background:#e0e0e0;border-radius:2px;margin-top:6px}
 .prob-bar{height:4px;border-radius:2px;background:#1a1a1a;transition:width .4s}
 
@@ -156,10 +160,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
     <div class="analysis-meta" id="analysisMeta"></div>
     <div id="analysisWarning"></div>
+    <div id="narrativeBlock"></div>
     <div class="stats-row" id="statsRow"></div>
     <div class="h2h-row" id="h2hRow"></div>
     <div class="markets-grid" id="marketsGrid"></div>
-    <div style="margin-top:10px;font-size:11px;color:#aaa;text-align:center">Analisi basata su dataset storico Sackmann — ultimi 20 match per giocatore</div>
+    <div style="margin-top:10px;font-size:11px;color:#aaa;text-align:center">Analisi ML su dataset storico · narrativa generata da Claude AI</div>
   </div>
 
   <!-- Aggiungi partita manuale -->
@@ -495,6 +500,14 @@ function renderAnalysis(d) {
     </div>`;
   } else {
     warn.innerHTML = `<div style="font-size:11px;color:#2e7d32;margin-bottom:10px">✓ Dati storici completi per entrambi i giocatori</div>`;
+  }
+
+  // Narrativa giornalistica
+  const nb = document.getElementById("narrativeBlock");
+  if (d.narrative) {
+    nb.innerHTML = `<div class="narrative-label">🤖 Analisi narrativa</div><div class="narrative-block">${d.narrative.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>`;
+  } else {
+    nb.innerHTML = "";
   }
 
   // Statistiche giocatori
