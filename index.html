@@ -501,10 +501,10 @@ async function loadNarrative(data) {
     if (d.narrative && !d.narrative.startsWith("[ERRORE")) {
       nb.innerHTML = `<div class="narrative-label">🤖 Analisi narrativa</div><div class="narrative-block">${d.narrative.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>`;
     } else {
-      nb.innerHTML = "";
+      nb.innerHTML = `<div class="narrative-label">🤖 Analisi narrativa</div><div class="narrative-loading" style="color:#e57373">⚠️ ${d.narrative || d.error || "Narrativa non disponibile"}</div>`;
     }
   } catch(e) {
-    nb.innerHTML = "";
+    nb.innerHTML = `<div class="narrative-label">🤖 Analisi narrativa</div><div class="narrative-loading" style="color:#e57373">⚠️ Errore: ${e.message}</div>`;
   }
 }
 
