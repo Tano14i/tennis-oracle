@@ -92,7 +92,7 @@ Perché: [1 riga]
 Tono: vivace, diretto, giornalistico. Massimo 300 parole."""
 
         # Chiama Gemini REST API direttamente (evita problemi di versione SDK)
-        model = "gemini-2.0-flash"
+        model = "gemini-2.5-flash"
         url   = (f"https://generativelanguage.googleapis.com/v1beta/models/"
                  f"{model}:generateContent?key={api_key}")
         body  = {"contents": [{"parts": [{"text": prompt}]}]}
