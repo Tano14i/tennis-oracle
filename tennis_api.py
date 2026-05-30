@@ -66,30 +66,45 @@ def generate_narrative(p1_name, p2_name, tournament, surface, tour,
         surf_names = {"Hard": "cemento", "Clay": "terra battuta", "Grass": "erba"}
         surf_it    = surf_names.get(surface, surface)
 
-        prompt = f"""Sei un analista sportivo tennis esperto. Scrivi un'analisi in italiano stile giornalistico/scommesse (come Sisal o Snai), basandoti sui dati statistici ML forniti. Usa la tua conoscenza generale sui giocatori per arricchire il testo.
+        import datetime
+        anno_corrente = datetime.datetime.now().year
 
+        prompt = f"""Sei un analista sportivo tennis. Scrivi un'analisi in italiano stile Sisal/Snai.
+
+REGOLE IMPORTANTI:
+- Anno corrente: {anno_corrente}. Non usare mai anni passati nel testo.
+- I dati ML sotto sono VERIFICATI e hanno precedenza su qualsiasi tua conoscenza pregressa.
+- Non contraddire i dati ML forniti.
+- Per ogni affermazione che fai, devi indicare la fonte tra parentesi: [Fonte: dati ML], [Fonte: conoscenza generale], o [Fonte: non documentato].
+- Se non hai dati recenti verificabili su un giocatore, scrivi esplicitamente "dati recenti non documentati".
+
+DATI ML VERIFICATI:
 PARTITA: {p1_name} vs {p2_name}
 TORNEO: {tournament or tour} | {surf_it} | {round_str} | Best of {best_of}
-FAVORITO ML: {favorite} ({win_pct}%)
-H2H: {h2h_str}
-{p1_name}: win rate {p1_stats_resp['win_rate']:.0f}%, ultimi 5 match {p1_stats_resp['recent_wr']:.0f}%, streak {p1_stats_resp['streak']:+d}, {surf_it} {p1_stats_resp['surf_wr']:.0f}%
-{p2_name}: win rate {p2_stats_resp['win_rate']:.0f}%, ultimi 5 match {p2_stats_resp['recent_wr']:.0f}%, streak {p2_stats_resp['streak']:+d}, {surf_it} {p2_stats_resp['surf_wr']:.0f}%
-MERCATI ML: {" | ".join(f"{m['bet_label']} {m['bet_prob']:.0f}% conf.{m['confidence']}" for m in markets_objs)}
+FAVORITO: {favorite} ({win_pct}% prob. vittoria) [Fonte: dati ML]
+H2H: {h2h_str} [Fonte: dati ML]
+{p1_name}: win rate {p1_stats_resp['win_rate']:.0f}%, ultimi 5 match {p1_stats_resp['recent_wr']:.0f}%, streak {p1_stats_resp['streak']:+d}, {surf_it} {p1_stats_resp['surf_wr']:.0f}% [Fonte: dati ML]
+{p2_name}: win rate {p2_stats_resp['win_rate']:.0f}%, ultimi 5 match {p2_stats_resp['recent_wr']:.0f}%, streak {p2_stats_resp['streak']:+d}, {surf_it} {p2_stats_resp['surf_wr']:.0f}% [Fonte: dati ML]
+MERCATI: {" | ".join(f"{m['bet_label']} {m['bet_prob']:.0f}% conf.{m['confidence']}" for m in markets_objs)}
 
-Scrivi ESATTAMENTE in questo formato (mantieni le emoji):
+Formato ESATTO (mantieni emoji, includi le fonti):
 
-🎾 {p1_name} vs {p2_name} — [Torneo Anno Round]
-🏆 Favorito: [nome] — [1 frase vivace e concreta sul perché, con riferimenti a stile di gioco o superficie]
+🎾 {p1_name} vs {p2_name} — [Torneo {anno_corrente} Round]
+🏆 Favorito: [nome] — [1 frase vivace sul perché, con fonte]
 📊 Analisi:
-[2-3 righe: forma recente di entrambi, differenze tattiche, importanza della superficie, H2H se rilevante]
-💰 Scommessa principale: [scommessa concreta]
-Perché: [2 righe di ragionamento specifico]
+[2-3 righe con fonti inline: es. "forma recente al 80% [ML]", "stile di gioco aggressivo [conoscenza generale]"]
+💰 Scommessa principale: [bet]
+Perché: [2 righe con fonti]
 Confidenza: [ALTA/MEDIA/BASSA]
-💡 Scommessa alternativa: [scommessa diversa]
-Perché: [1 riga]
-⚠️ Attenzione: [1 variabile di rischio concreta]
+💡 Scommessa alternativa: [bet]
+Perché: [1 riga con fonte]
+⚠️ Attenzione: [1 rischio con fonte]
 
-Tono: vivace, diretto, giornalistico. Massimo 300 parole."""
+📋 Fonti usate:
+- Dati ML: [elenca metriche usate]
+- Conoscenza generale: [elenca cosa sai sui giocatori o lascia "nessuna informazione verificata disponibile"]
+
+Massimo 350 parole. Tono vivace e diretto."""
 
         # Chiama Gemini REST API direttamente (evita problemi di versione SDK)
         model = "gemini-2.5-flash"

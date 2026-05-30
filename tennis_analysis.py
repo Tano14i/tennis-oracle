@@ -71,13 +71,14 @@ def explain_sets(p1_name, p2_name, p1_stats, p2_stats, surface, best_of, prob_ov
 
     wr1 = p1_stats.get("p_win_rate", 0.5)
     wr2 = p2_stats.get("p_win_rate", 0.5)
-    rank_diff = abs(p1_stats.get("p_rank", 200) - p2_stats.get("p_rank", 200))
+    wr_diff = abs(wr1 - wr2)
 
-    # Differenza di livello
-    if rank_diff > 50:
-        reasons.append(f"Grande differenza di ranking ({int(rank_diff)} posizioni) favorisce match diretto")
-    elif rank_diff < 20:
-        reasons.append(f"Giocatori di livello simile, alta probabilità di lotta")
+    # Differenza di livello basata su win rate (p_rank non disponibile nel dataset)
+    if wr_diff > 0.20:
+        stronger = p1_name if wr1 > wr2 else p2_name
+        reasons.append(f"Netto divario di livello: {stronger} domina su win rate ({max(wr1,wr2)*100:.0f}% vs {min(wr1,wr2)*100:.0f}%)")
+    elif wr_diff < 0.06:
+        reasons.append(f"Win rate simili ({wr1*100:.0f}% vs {wr2*100:.0f}%) — match equilibrato")
 
     # Superficie
     if surface == "Clay":
@@ -85,10 +86,9 @@ def explain_sets(p1_name, p2_name, p1_stats, p2_stats, surface, best_of, prob_ov
     elif surface == "Grass":
         reasons.append("Su erba i match spesso si decidono in fretta (servizio dominante)")
 
-    # Win rate simile = più set
-    wr_diff = abs(wr1 - wr2)
-    if wr_diff < 0.05:
-        reasons.append(f"Win rate simili ({wr1*100:.0f}% vs {wr2*100:.0f}%) — match equilibrato")
+    # Best of 5
+    if best_of == 5:
+        reasons.append("Formato Best of 5: più opportunità di rimonta per l'outsider")
 
     return reasons
 

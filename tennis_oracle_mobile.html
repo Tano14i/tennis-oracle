@@ -122,7 +122,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <h1>🎾 Tennis Oracle</h1>
     <div class="header-sub" id="dateLabel">Caricamento...</div>
   </div>
-  <button class="btn-refresh" onclick="loadSchedule()">🔄 Aggiorna</button>
+  <div style="display:flex;gap:8px;align-items:center">
+    <input type="date" id="datePicker" style="background:rgba(255,255,255,0.1);border:none;color:#fff;padding:7px 10px;border-radius:8px;font-size:13px;cursor:pointer;color-scheme:dark" onchange="loadSchedule()">
+    <button class="btn-refresh" onclick="loadSchedule()">🔄</button>
+  </div>
 </div>
 
 <div class="filters">
@@ -150,6 +153,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 <div id="pager" class="pager"></div>
 
+<!-- Top 5 Picks -->
+<div id="top5Section" style="display:none;padding:12px 16px">
+  <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">⭐ Top 5 picks del giorno</div>
+  <div id="top5List"></div>
+</div>
+
 <div class="content">
 
   <!-- Pannello analisi ML -->
@@ -164,7 +173,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="stats-row" id="statsRow"></div>
     <div class="h2h-row" id="h2hRow"></div>
     <div class="markets-grid" id="marketsGrid"></div>
-    <div style="margin-top:10px;font-size:11px;color:#aaa;text-align:center">Analisi ML su dataset storico · narrativa generata da Claude AI</div>
+    <div style="margin-top:10px;font-size:11px;color:#aaa;text-align:center">Analisi ML su dataset storico · narrativa generata da Gemini AI</div>
   </div>
 
   <!-- Aggiungi partita manuale -->
@@ -289,10 +298,12 @@ async function loadSchedule() {
   closeAnalysis();
 
   try {
-    const today = new Date();
-    const d = today.toISOString().slice(0,10).replace(/-/g,"");
-    const todayISO = today.toISOString().slice(0,10);
-    document.getElementById("dateLabel").textContent = today.toLocaleDateString("it-IT", {weekday:"long", day:"numeric", month:"long", year:"numeric"});
+    const picker = document.getElementById("datePicker");
+    const todayISO = picker.value || new Date().toISOString().slice(0,10);
+    if (!picker.value) picker.value = todayISO;
+    const d = todayISO.replace(/-/g,"");
+    const dateObj = new Date(todayISO + "T12:00:00");
+    document.getElementById("dateLabel").textContent = dateObj.toLocaleDateString("it-IT", {weekday:"long", day:"numeric", month:"long", year:"numeric"});
 
     const endpoints = [
       ["https://site.api.espn.com/apis/site/v2/sports/tennis/atp/scoreboard?dates=" + d, "ATP"],
@@ -361,6 +372,7 @@ async function loadSchedule() {
       document.getElementById("countLabel").textContent = "";
     } else {
       applyFilters();
+      computeTop5();
     }
   } catch(e) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div>Errore di connessione.<br><small>' + e.message + '</small></div>';
@@ -413,6 +425,80 @@ function render() {
 }
 
 function goPage(p) { page = p; render(); }
+
+// ---- Top 5 picks del giorno ----
+async function computeTop5() {
+  if (!apiReady || !all.length) return;
+  const section = document.getElementById("top5Section");
+  const list    = document.getElementById("top5List");
+  section.style.display = "block";
+  list.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">⏳ Calcolo picks in corso…</div>';
+
+  // Prendi le prime 12 partite ATP/WTA (evita troppe chiamate)
+  const candidates = all.filter(m => ["ATP","WTA"].includes(m.tour)).slice(0, 12);
+  if (!candidates.length) { section.style.display = "none"; return; }
+
+  const results = await Promise.allSettled(candidates.map(m =>
+    fetch(API_URL + "/analyze", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({p1:m.p1, p2:m.p2, surface:m.surface, tour:m.tour,
+                            round:m.round, tournament:m.tournament||"", best_of:3}),
+      signal: AbortSignal.timeout(20000)
+    }).then(r => r.json()).then(d => ({match: m, data: d}))
+  ));
+
+  // Calcola score: confidenza + distanza da 50%
+  const scored = [];
+  const confScore = {alta:3, media:2, bassa:1};
+  for (const r of results) {
+    if (r.status !== "fulfilled") continue;
+    const {match, data} = r.value;
+    if (data.error) continue;
+    for (const [key, mk] of Object.entries(data.markets || {})) {
+      if (!mk.show || mk.confidence === "bassa") continue;
+      const edge = Math.abs(mk.bet_prob - 50);
+      if (edge < 15) continue;
+      const score = (confScore[mk.confidence] || 1) * edge;
+      scored.push({match, key, mk, score, data});
+    }
+  }
+
+  scored.sort((a,b) => b.score - a.score);
+  const top5 = scored.slice(0, 5);
+
+  if (!top5.length) { list.innerHTML = '<div style="font-size:13px;color:#888;padding:8px 0">Nessuna pick ad alta confidenza oggi.</div>'; return; }
+
+  const surfIcon = {Clay:"🟤", Grass:"🟢", Hard:"🔵"};
+  const confColor = {alta:"#2e7d32", media:"#7a5c00"};
+  list.innerHTML = top5.map((p, i) => `
+    <div style="background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer"
+         onclick="selectMatchByName('${p.match.p1}','${p.match.p2}')">
+      <div style="font-size:11px;color:#888;margin-bottom:4px">${i+1}. ${surfIcon[p.match.surface]||"⚪"} ${p.match.tournament} · ${p.match.round}</div>
+      <div style="font-size:14px;font-weight:500;margin-bottom:4px">${p.match.p1} vs ${p.match.p2}</div>
+      <div style="font-size:13px;color:${confColor[p.mk.confidence]||"#555"}">
+        ✓ <strong>${p.mk.bet_label}</strong> — ${p.mk.bet_prob.toFixed(0)}%
+        <span style="font-size:11px;margin-left:6px;background:${p.mk.confidence==="alta"?"#e8f5e9":"#fffde7"};padding:2px 6px;border-radius:4px">${p.mk.confidence}</span>
+      </div>
+    </div>`).join("");
+}
+
+function selectMatchByName(p1, p2) {
+  const idx = all.findIndex(m => m.p1 === p1 && m.p2 === p2);
+  if (idx >= 0) {
+    // Resetta filtri e naviga alla pagina giusta
+    document.getElementById("fTour").value = "all";
+    document.getElementById("fSurf").value = "all";
+    document.getElementById("fTournament").value = "all";
+    filtered = [...all];
+    page = Math.floor(idx / PAGE);
+    selIdx = idx;
+    document.getElementById("countLabel").textContent = filtered.length + " partite";
+    render();
+    document.getElementById("btnAnalyze").disabled = false;
+    document.getElementById("matchList").scrollIntoView({behavior:"smooth"});
+  }
+}
 
 function selectMatch(idx) {
   selIdx = idx;
