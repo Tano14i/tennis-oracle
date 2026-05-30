@@ -44,33 +44,22 @@ except Exception as e:
 def generate_narrative(p1_name, p2_name, tournament, surface, tour,
                        round_str, best_of, predictions, p1_stats_resp,
                        p2_stats_resp, h2h_resp, data_quality):
-    """Genera narrativa giornalistica con Claude API + web search."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    """Genera narrativa giornalistica con Gemini API."""
+    api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         return None
 
     try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
 
         winner_pred = predictions.get("winner", {})
         prob        = winner_pred.get("prob", 0.5)
         favorite    = p1_name if prob >= 0.5 else p2_name
-        underdog    = p2_name if prob >= 0.5 else p1_name
         win_pct     = round(max(prob, 1 - prob) * 100)
 
-        # Mercati rilevanti
-        markets_lines = []
-        markets_lines_objs = []
-        for mk, pred in predictions.items():
-            if pred.get("show"):
-                markets_lines.append(
-                    f"  - {pred['title']}: {pred['bet_label']} ({pred['bet_prob']:.0f}%)"
-                    f" — confidenza {pred['confidence']}"
-                )
-                markets_lines_objs.append(pred)
+        markets_objs = [p for p in predictions.values() if p.get("show")]
 
-        # H2H
         h2h_total = h2h_resp.get("total", 0)
         h2h_str   = (f"{p1_name} {h2h_resp['p1_wins']}-{h2h_resp['p2_wins']} {p2_name}"
                      if h2h_total > 0 else "nessun precedente")
@@ -78,37 +67,35 @@ def generate_narrative(p1_name, p2_name, tournament, surface, tour,
         surf_names = {"Hard": "cemento", "Clay": "terra battuta", "Grass": "erba"}
         surf_it    = surf_names.get(surface, surface)
 
-        prompt = f"""Sei un analista sportivo tennis. Genera un'analisi in italiano basata sui dati ML forniti.
+        prompt = f"""Sei un analista sportivo tennis esperto. Scrivi un'analisi in italiano stile giornalistico/scommesse (come Sisal o Snai), basandoti sui dati statistici ML forniti. Usa la tua conoscenza generale sui giocatori per arricchire il testo.
 
-PARTITA: {p1_name} vs {p2_name} | {tournament or tour} | {surf_it} | {round_str} | Bo{best_of}
-FAVORITO ML: {favorite} {win_pct}% | H2H: {h2h_str}
-{p1_name}: wr {p1_stats_resp['win_rate']:.0f}% recente {p1_stats_resp['recent_wr']:.0f}% streak {p1_stats_resp['streak']:+d}
-{p2_name}: wr {p2_stats_resp['win_rate']:.0f}% recente {p2_stats_resp['recent_wr']:.0f}% streak {p2_stats_resp['streak']:+d}
-MERCATI: {" | ".join(f"{m['bet_label']} {m['bet_prob']:.0f}% ({m['confidence']})" for m in markets_lines_objs)}
+PARTITA: {p1_name} vs {p2_name}
+TORNEO: {tournament or tour} | {surf_it} | {round_str} | Best of {best_of}
+FAVORITO ML: {favorite} ({win_pct}%)
+H2H: {h2h_str}
+{p1_name}: win rate {p1_stats_resp['win_rate']:.0f}%, ultimi 5 match {p1_stats_resp['recent_wr']:.0f}%, streak {p1_stats_resp['streak']:+d}, {surf_it} {p1_stats_resp['surf_wr']:.0f}%
+{p2_name}: win rate {p2_stats_resp['win_rate']:.0f}%, ultimi 5 match {p2_stats_resp['recent_wr']:.0f}%, streak {p2_stats_resp['streak']:+d}, {surf_it} {p2_stats_resp['surf_wr']:.0f}%
+MERCATI ML: {" | ".join(f"{m['bet_label']} {m['bet_prob']:.0f}% conf.{m['confidence']}" for m in markets_objs)}
 
-Formato ESATTO (mantieni emoji e struttura):
-🎾 {p1_name} vs {p2_name} — [torneo round]
-🏆 Favorito: [nome] — [frase vivace 1 riga sul perché]
-📊 Analisi: [2-3 righe su forma, superfice, tattica, H2H]
-💰 Scommessa principale: [bet]
-Perché: [2 righe ragionamento]
+Scrivi ESATTAMENTE in questo formato (mantieni le emoji):
+
+🎾 {p1_name} vs {p2_name} — [Torneo Anno Round]
+🏆 Favorito: [nome] — [1 frase vivace e concreta sul perché, con riferimenti a stile di gioco o superficie]
+📊 Analisi:
+[2-3 righe: forma recente di entrambi, differenze tattiche, importanza della superficie, H2H se rilevante]
+💰 Scommessa principale: [scommessa concreta]
+Perché: [2 righe di ragionamento specifico]
 Confidenza: [ALTA/MEDIA/BASSA]
-💡 Scommessa alternativa: [bet secondario]
+💡 Scommessa alternativa: [scommessa diversa]
 Perché: [1 riga]
-⚠️ Attenzione: [1 variabile di rischio]"""
+⚠️ Attenzione: [1 variabile di rischio concreta]
 
-        resp = client.messages.create(
-            model="claude-haiku-4-5",
-            max_tokens=1000,
-            messages=[{"role": "user", "content": prompt}]
-        )
+Tono: vivace, diretto, giornalistico. Massimo 300 parole."""
 
-        narrative = ""
-        for block in resp.content:
-            if hasattr(block, "text"):
-                narrative += block.text
-
-        return narrative.strip() if narrative.strip() else None
+        model    = genai.GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(prompt)
+        narrative = response.text.strip()
+        return narrative if narrative else None
 
     except Exception as e:
         print(f"Narrative generation failed: {e}\n{traceback.format_exc()}")
@@ -125,7 +112,7 @@ def health():
         "status": "ok",
         "models_ready": MODELS_READY,
         "players": len(player_stats) if MODELS_READY else 0,
-        "narrative_enabled": bool(os.environ.get("ANTHROPIC_API_KEY"))
+        "narrative_enabled": bool(os.environ.get("GEMINI_API_KEY"))
     })
 
 
