@@ -303,6 +303,7 @@ def _analyze_inner():
         "markets":          markets,
         "data_quality":     data_quality,
         "quality_warnings": quality_warnings,
+        "tournament":       tournament,
     })
 
 
