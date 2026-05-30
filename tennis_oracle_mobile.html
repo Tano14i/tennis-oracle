@@ -463,20 +463,48 @@ async function analyzeSelected() {
       body: JSON.stringify({
         p1: m.p1, p2: m.p2,
         surface: m.surface, tour: m.tour,
-        round: m.round, best_of: m.tour === "WTA" ? 3 : 3
+        round: m.round, tournament: m.tournament || "",
+        best_of: m.tour === "WTA" ? 3 : 3
       }),
-      signal: AbortSignal.timeout(15000)
+      signal: AbortSignal.timeout(25000)
     });
 
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     renderAnalysis(data);
+
+    // Narrativa in background (non blocca i risultati ML)
+    loadNarrative(data);
+
   } catch(e) {
     showToast("⚠️ Errore analisi: " + e.message);
   } finally {
     btn.disabled = false;
     btn.classList.remove("loading");
     btn.textContent = "✨ Analizza partita selezionata";
+  }
+}
+
+async function loadNarrative(data) {
+  const nb = document.getElementById("narrativeBlock");
+  if (!nb) return;
+  nb.innerHTML = `<div class="narrative-label">🤖 Analisi narrativa</div><div class="narrative-loading">⏳ Gemini sta analizzando la partita…</div>`;
+  try {
+    const res = await fetch(API_URL + "/narrative", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(data),
+      signal: AbortSignal.timeout(60000)
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const d = await res.json();
+    if (d.narrative && !d.narrative.startsWith("[ERRORE")) {
+      nb.innerHTML = `<div class="narrative-label">🤖 Analisi narrativa</div><div class="narrative-block">${d.narrative.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>`;
+    } else {
+      nb.innerHTML = "";
+    }
+  } catch(e) {
+    nb.innerHTML = "";
   }
 }
 
@@ -500,14 +528,6 @@ function renderAnalysis(d) {
     </div>`;
   } else {
     warn.innerHTML = `<div style="font-size:11px;color:#2e7d32;margin-bottom:10px">✓ Dati storici completi per entrambi i giocatori</div>`;
-  }
-
-  // Narrativa giornalistica
-  const nb = document.getElementById("narrativeBlock");
-  if (d.narrative) {
-    nb.innerHTML = `<div class="narrative-label">🤖 Analisi narrativa</div><div class="narrative-block">${d.narrative.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>`;
-  } else {
-    nb.innerHTML = "";
   }
 
   // Statistiche giocatori

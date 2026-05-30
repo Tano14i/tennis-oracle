@@ -287,12 +287,6 @@ def _analyze_inner():
             "reasons":    reasons[:3],
         }
 
-    # Narrativa giornalistica (Claude API + web search)
-    narrative = generate_narrative(
-        p1_name, p2_name, tournament, surface, tour, round_str, best_of,
-        markets, p1_stats_resp, p2_stats_resp, h2h_resp, data_quality
-    )
-
     return jsonify({
         "p1_name":          p1_name,
         "p2_name":          p2_name,
@@ -309,8 +303,37 @@ def _analyze_inner():
         "markets":          markets,
         "data_quality":     data_quality,
         "quality_warnings": quality_warnings,
-        "narrative":        narrative,
     })
+
+
+# ---------------------------------------------------------------------------
+# Endpoint narrativa separato (chiamato dal frontend dopo i risultati ML)
+# ---------------------------------------------------------------------------
+
+@app.route("/narrative", methods=["POST"])
+def narrative_endpoint():
+    try:
+        data       = request.get_json(force=True)
+        p1_name    = data.get("p1_name", "")
+        p2_name    = data.get("p2_name", "")
+        tournament = data.get("tournament", "")
+        surface    = data.get("surface", "Hard")
+        tour       = data.get("tour", "ATP")
+        round_str  = data.get("round", "R32")
+        best_of    = int(data.get("best_of", 3))
+        predictions = data.get("markets", {})
+        p1_stats_resp = data.get("p1_stats", {})
+        p2_stats_resp = data.get("p2_stats", {})
+        h2h_resp      = data.get("h2h", {})
+        data_quality  = data.get("data_quality", "media")
+
+        narrative = generate_narrative(
+            p1_name, p2_name, tournament, surface, tour, round_str, best_of,
+            predictions, p1_stats_resp, p2_stats_resp, h2h_resp, data_quality
+        )
+        return jsonify({"narrative": narrative})
+    except Exception as e:
+        return jsonify({"narrative": None, "error": str(e)}), 500
 
 
 # ---------------------------------------------------------------------------
