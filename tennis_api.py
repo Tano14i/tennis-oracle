@@ -50,8 +50,7 @@ def generate_narrative(p1_name, p2_name, tournament, surface, tour,
         return None
 
     try:
-        from google import genai
-        client = genai.Client(api_key=api_key)
+        import requests as req
 
         winner_pred = predictions.get("winner", {})
         prob        = winner_pred.get("prob", 0.5)
@@ -92,11 +91,14 @@ Perché: [1 riga]
 
 Tono: vivace, diretto, giornalistico. Massimo 300 parole."""
 
-        response  = client.models.generate_content(
-            model="gemini-2.5-flash-preview-05-20",
-            contents=prompt
-        )
-        narrative = response.text.strip()
+        # Chiama Gemini REST API direttamente (evita problemi di versione SDK)
+        model = "gemini-2.0-flash"
+        url   = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+                 f"{model}:generateContent?key={api_key}")
+        body  = {"contents": [{"parts": [{"text": prompt}]}]}
+        r     = req.post(url, json=body, timeout=30)
+        r.raise_for_status()
+        narrative = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
         return narrative if narrative else None
 
     except Exception as e:
