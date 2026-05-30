@@ -50,8 +50,8 @@ def generate_narrative(p1_name, p2_name, tournament, surface, tour,
         return None
 
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
+        from google import genai
+        client = genai.Client(api_key=api_key)
 
         winner_pred = predictions.get("winner", {})
         prob        = winner_pred.get("prob", 0.5)
@@ -92,8 +92,10 @@ Perché: [1 riga]
 
 Tono: vivace, diretto, giornalistico. Massimo 300 parole."""
 
-        model    = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
+        response  = client.models.generate_content(
+            model="gemini-2.0-flash-lite",
+            contents=prompt
+        )
         narrative = response.text.strip()
         return narrative if narrative else None
 
