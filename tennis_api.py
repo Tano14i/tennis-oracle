@@ -93,7 +93,7 @@ Perché: [1 riga]
 Tono: vivace, diretto, giornalistico. Massimo 300 parole."""
 
         response  = client.models.generate_content(
-            model="gemini-2.0-flash-lite",
+            model="gemini-2.0-flash",
             contents=prompt
         )
         narrative = response.text.strip()
