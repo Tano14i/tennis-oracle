@@ -56,11 +56,16 @@ FEATURE_COLS_BASE = [
     "p1_wr_surface", "p2_wr_surface",
     "h2h_p1_win_rate", "h2h_total",
     "p1_recent_wr", "p2_recent_wr",
+    "p1_weighted_wr", "p2_weighted_wr",   # forma pesata per qualità avversario
+    "p1_avg_opp_rank", "p2_avg_opp_rank", # livello medio avversari affrontati
     "p1_streak", "p2_streak",
 ]
 
 # Feature extra per winner
-FEATURE_COLS_WINNER = FEATURE_COLS_BASE + ["form_diff", "surf_wr_diff", "recent_form_diff", "streak_diff"]
+FEATURE_COLS_WINNER = FEATURE_COLS_BASE + [
+    "form_diff", "surf_wr_diff", "recent_form_diff", "streak_diff",
+    "weighted_wr_diff", "opp_rank_diff",
+]
 
 
 def _safe_float(val, default=0.0):
@@ -106,16 +111,20 @@ def build_row(row, player_stats, surface_stats, flip=False, h2h_lookup=None, row
     p2_surf  = surface_stats.get(int(p2_id) if p2_id and not pd.isna(p2_id) else -1, {})
     surf_key = f"wr_{surface.lower()}"
 
-    p1_aces    = p1_stats.get("p_aces_avg", 5.0)
-    p2_aces    = p2_stats.get("p_aces_avg", 5.0)
-    p1_wr      = p1_stats.get("p_win_rate", 0.5)
-    p2_wr      = p2_stats.get("p_win_rate", 0.5)
-    p1_swr     = p1_surf.get(surf_key, 0.5)
-    p2_swr     = p2_surf.get(surf_key, 0.5)
-    p1_rwr     = p1_stats.get("p_recent_wr", p1_wr)
-    p2_rwr     = p2_stats.get("p_recent_wr", p2_wr)
-    p1_streak  = p1_stats.get("p_streak", 0)
-    p2_streak  = p2_stats.get("p_streak", 0)
+    p1_aces     = p1_stats.get("p_aces_avg", 5.0)
+    p2_aces     = p2_stats.get("p_aces_avg", 5.0)
+    p1_wr       = p1_stats.get("p_win_rate", 0.5)
+    p2_wr       = p2_stats.get("p_win_rate", 0.5)
+    p1_swr      = p1_surf.get(surf_key, 0.5)
+    p2_swr      = p2_surf.get(surf_key, 0.5)
+    p1_rwr      = p1_stats.get("p_recent_wr", p1_wr)
+    p2_rwr      = p2_stats.get("p_recent_wr", p2_wr)
+    p1_wwr      = p1_stats.get("p_weighted_wr", p1_rwr)   # forma pesata avversario
+    p2_wwr      = p2_stats.get("p_weighted_wr", p2_rwr)
+    p1_opp_rank = p1_stats.get("p_avg_opp_rank", 150.0)
+    p2_opp_rank = p2_stats.get("p_avg_opp_rank", 150.0)
+    p1_streak   = p1_stats.get("p_streak", 0)
+    p2_streak   = p2_stats.get("p_streak", 0)
 
     h2h_entry = h2h_lookup[row_idx] if (h2h_lookup and row_idx is not None and row_idx in h2h_lookup) else {}
 
@@ -146,14 +155,20 @@ def build_row(row, player_stats, surface_stats, flip=False, h2h_lookup=None, row
         "p2_wr_surface": p2_swr,
         "h2h_p1_win_rate": h2h_entry.get("h2h_p1_win_rate", 0.5),
         "h2h_total":       h2h_entry.get("h2h_total", 0),
-        "p1_recent_wr":  p1_rwr,
-        "p2_recent_wr":  p2_rwr,
-        "p1_streak":     p1_streak,
-        "p2_streak":     p2_streak,
-        "form_diff":       p1_wr  - p2_wr,
-        "surf_wr_diff":    p1_swr - p2_swr,
+        "p1_recent_wr":     p1_rwr,
+        "p2_recent_wr":     p2_rwr,
+        "p1_weighted_wr":   p1_wwr,
+        "p2_weighted_wr":   p2_wwr,
+        "p1_avg_opp_rank":  p1_opp_rank,
+        "p2_avg_opp_rank":  p2_opp_rank,
+        "p1_streak":        p1_streak,
+        "p2_streak":        p2_streak,
+        "form_diff":        p1_wr  - p2_wr,
+        "surf_wr_diff":     p1_swr - p2_swr,
         "recent_form_diff": p1_rwr - p2_rwr,
-        "streak_diff":     p1_streak - p2_streak,
+        "streak_diff":      p1_streak - p2_streak,
+        "weighted_wr_diff": p1_wwr - p2_wwr,
+        "opp_rank_diff":    p1_opp_rank - p2_opp_rank,  # p1 ha giocato vs avversari più forti se >0
     }
 
 

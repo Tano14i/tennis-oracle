@@ -15,39 +15,58 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-ATP_URL = "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_{year}.csv"
-WTA_URL = "https://raw.githubusercontent.com/JeffSackmann/tennis_wta/master/wta_matches_{year}.csv"
+ATP_URL        = "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_{year}.csv"
+WTA_URL        = "https://raw.githubusercontent.com/JeffSackmann/tennis_wta/master/wta_matches_{year}.csv"
+ATP_CHALL_URL  = "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_qual_chall_{year}.csv"
+ATP_FUTURES_URL= "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_futures_{year}.csv"
 
 YEARS = list(range(2018, datetime.now().year + 1))
+
+# Fonti da includere: (nome_file_prefix, url_template, etichetta_tour, includi_per_stats)
+# includi_per_stats=False significa: usiamo i dati per arricchire il ranking avversario
+# ma non per il training diretto dei modelli
+SOURCES = [
+    ("atp",         ATP_URL,         "ATP",        True),
+    ("wta",         WTA_URL,         "WTA",        True),
+    ("atp_chall",   ATP_CHALL_URL,   "Challenger", True),
+    ("atp_futures", ATP_FUTURES_URL, "ITF",        False),  # solo per ranking context
+]
 
 
 # ---------------------------------------------------------------------------
 # Download
 # ---------------------------------------------------------------------------
 
-def download_dataset(force=False):
-    """Scarica tutti gli anni ATP e WTA e li salva in data/."""
+def download_dataset(force=False, include_challenger=True, include_futures=False):
+    """Scarica ATP, WTA e opzionalmente Challenger/Futures da Sackmann GitHub."""
     dfs = []
     for year in YEARS:
-        for tour, url_template in [("ATP", ATP_URL), ("WTA", WTA_URL)]:
-            fname = os.path.join(DATA_DIR, f"{tour.lower()}_{year}.csv")
+        for prefix, url_template, tour_label, use_for_training in SOURCES:
+            if not include_challenger and tour_label == "Challenger":
+                continue
+            if not include_futures and tour_label == "ITF":
+                continue
+
+            fname = os.path.join(DATA_DIR, f"{prefix}_{year}.csv")
             if not os.path.exists(fname) or force:
                 url = url_template.format(year=year)
                 try:
                     r = requests.get(url, timeout=30)
-                    if r.status_code == 200 and len(r.content) > 1000:
+                    if r.status_code == 200 and len(r.content) > 500:
                         with open(fname, "w", encoding="utf-8") as f:
                             f.write(r.text)
-                        print(f"Scaricato: {tour} {year}")
+                        print(f"Scaricato: {tour_label} {year}")
                     else:
                         continue
                 except Exception as e:
-                    print(f"Errore {tour} {year}: {e}")
+                    print(f"Errore {tour_label} {year}: {e}")
                     continue
+
             try:
-                df = pd.read_csv(fname, low_memory=False)
-                df["tour"] = tour
-                dfs.append(df)
+                df_year = pd.read_csv(fname, low_memory=False)
+                df_year["tour"]             = tour_label
+                df_year["use_for_training"] = use_for_training
+                dfs.append(df_year)
             except Exception:
                 pass
 
@@ -136,8 +155,12 @@ def _build_player_rows(df):
     """
     Ritorna un DataFrame con una riga per ogni (giocatore, partita),
     indipendentemente dal fatto che abbia vinto o perso.
-    Elimina il selection bias di calcolare stats solo su winner_id o loser_id.
+    Elimina il selection bias. Include ranking avversario per forma pesata.
     """
+    # Usa ranking se disponibile, altrimenti 300 (basso = migliore)
+    w_rank = df.get("winner_rank", pd.Series([300]*len(df), index=df.index)).fillna(300)
+    l_rank = df.get("loser_rank",  pd.Series([300]*len(df), index=df.index)).fillna(300)
+
     winner_rows = df[["tourney_date", "surface", "winner_id", "loser_id",
                        "w_ace", "w_df", "w_svpt", "w_1stIn", "w_1stWon", "w_2ndWon"]].copy()
     winner_rows = winner_rows.rename(columns={
@@ -146,7 +169,9 @@ def _build_player_rows(df):
         "w_svpt": "svpt", "w_1stIn": "first_in",
         "w_1stWon": "first_won", "w_2ndWon": "second_won",
     })
-    winner_rows["won"] = 1
+    winner_rows["won"]          = 1
+    winner_rows["player_rank"]  = w_rank.values
+    winner_rows["opp_rank"]     = l_rank.values
 
     loser_rows = df[["tourney_date", "surface", "loser_id", "winner_id",
                       "l_ace", "l_df", "l_svpt", "l_1stIn", "l_1stWon", "l_2ndWon"]].copy()
@@ -156,7 +181,9 @@ def _build_player_rows(df):
         "l_svpt": "svpt", "l_1stIn": "first_in",
         "l_1stWon": "first_won", "l_2ndWon": "second_won",
     })
-    loser_rows["won"] = 0
+    loser_rows["won"]         = 0
+    loser_rows["player_rank"] = l_rank.values
+    loser_rows["opp_rank"]    = w_rank.values
 
     rows = pd.concat([winner_rows, loser_rows], ignore_index=True)
     rows = rows.sort_values(["player_id", "tourney_date"]).reset_index(drop=True)
@@ -190,6 +217,20 @@ def build_player_stats_lookup(df):
         # Forma recente: win rate ultimi 5 match
         recent_wr = last_5["won"].mean() if len(last_5) > 0 else win_rate
 
+        # Forma pesata per qualità avversario (ultimi 10 match)
+        # Vittoria contro rank 10 pesa di più che contro rank 200
+        # Peso = 1 / opp_rank normalizzato su scala 1-300
+        last_10 = group.tail(10)
+        if len(last_10) > 0 and "opp_rank" in last_10.columns:
+            opp_ranks = last_10["opp_rank"].clip(1, 300)
+            weights   = (301 - opp_ranks) / 300  # rank 1 -> peso 1.0, rank 300 -> 0.003
+            weighted_wr = float(np.average(last_10["won"], weights=weights))
+        else:
+            weighted_wr = recent_wr
+
+        # Ranking medio avversari (proxy del livello di competizione affrontata)
+        avg_opp_rank = float(group["opp_rank"].mean()) if "opp_rank" in group.columns else 150.0
+
         # Streak: conta vittorie/sconfitte consecutive dall'ultimo match
         results_seq = group["won"].tolist()
         streak = 0
@@ -206,15 +247,17 @@ def build_player_stats_lookup(df):
         def _f(v): return round(float(v), 3) if not np.isnan(v) else 0.0
 
         lookup[pid] = {
-            "p_aces_avg":   _f(aces),
-            "p_df_avg":     _f(df_rate),
-            "p_1st_in":     _f(first_in),
-            "p_1st_won":    _f(first_won),
-            "p_2nd_won":    _f(second_won),
-            "p_win_rate":   _f(win_rate),
-            "p_recent_wr":  _f(recent_wr),
-            "p_streak":     int(streak),
-            "p_matches":    len(group),
+            "p_aces_avg":       _f(aces),
+            "p_df_avg":         _f(df_rate),
+            "p_1st_in":         _f(first_in),
+            "p_1st_won":        _f(first_won),
+            "p_2nd_won":        _f(second_won),
+            "p_win_rate":       _f(win_rate),
+            "p_recent_wr":      _f(recent_wr),
+            "p_weighted_wr":    _f(weighted_wr),   # forma pesata per qualità avversario
+            "p_avg_opp_rank":   round(avg_opp_rank, 1),  # livello medio avversari
+            "p_streak":         int(streak),
+            "p_matches":        len(group),
         }
 
     return lookup

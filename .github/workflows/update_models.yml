@@ -1,0 +1,62 @@
+name: Update ML Models Monthly
+
+on:
+  schedule:
+    # Ogni 1° del mese alle 03:00 UTC
+    - cron: "0 3 1 * *"
+  workflow_dispatch:  # trigger manuale da GitHub Actions UI
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pandas numpy scikit-learn joblib requests pyarrow
+
+      - name: Download latest data (ATP + WTA + Challenger)
+        run: |
+          python - <<'EOF'
+          import sys
+          sys.path.insert(0, ".")
+          from tennis_dataset import download_dataset
+          print("Scaricamento dati (ATP + WTA + Challenger)...")
+          df = download_dataset(force=True, include_challenger=True, include_futures=False)
+          print(f"Dataset: {len(df):,} match scaricati")
+          EOF
+
+      - name: Retrain models
+        run: |
+          python tennis_trainer.py
+
+      - name: Run backtesting
+        run: |
+          python tennis_backtest.py 2>&1 | tee backtest_results.txt
+
+      - name: Commit updated models
+        run: |
+          git config user.name  "Tennis Oracle Bot"
+          git config user.email "bot@tennis-oracle.com"
+          git add models/*.pkl backtest_results.txt backtest_picks.csv || true
+          git diff --staged --quiet || git commit -m "Monthly model update $(date '+%Y-%m-%d')"
+          git push
+
+      - name: Push models to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git remote add space https://Fabio14i:${HF_TOKEN}@huggingface.co/spaces/Fabio14i/tennis-oracle-api || true
+          git push space main --force

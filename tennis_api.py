@@ -17,6 +17,7 @@ from tennis_dataset import find_player_id, get_h2h, get_h2h_on_surface
 from tennis_models import predict_match, MODELS_DIR, RELIABLE_MARKETS
 from tennis_analysis import (explain_winner, explain_sets, explain_games,
                               explain_aces, explain_tiebreak)
+from tennis_odds import get_tennis_odds, parse_match_odds, find_value_bets, remaining_requests
 
 app = Flask(__name__)
 CORS(app)
@@ -316,7 +317,47 @@ def _analyze_inner():
         "data_quality":     data_quality,
         "quality_warnings": quality_warnings,
         "tournament":       tournament,
-        "dataset_note":     "Statistiche calcolate su match ATP/WTA ufficiali. Challenger e ITF non inclusi.",
+        "dataset_note":     "Statistiche su match ATP/WTA + Challenger ufficiali.",
+        "value_bets":       _get_value_bets(p1_name, p2_name, markets),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Cache quote (aggiornate ogni 10 minuti per risparmiare richieste API)
+# ---------------------------------------------------------------------------
+
+import time as _time
+_odds_cache = {"data": [], "ts": 0}
+_ODDS_TTL   = 600  # secondi
+
+def _get_cached_odds():
+    now = _time.time()
+    if now - _odds_cache["ts"] > _ODDS_TTL:
+        try:
+            raw  = get_tennis_odds()
+            _odds_cache["data"] = parse_match_odds(raw)
+            _odds_cache["ts"]   = now
+        except Exception as e:
+            print(f"Odds fetch error: {e}")
+    return _odds_cache["data"]
+
+def _get_value_bets(p1_name, p2_name, markets):
+    try:
+        odds = _get_cached_odds()
+        if not odds:
+            return {}
+        return find_value_bets(markets, odds, p1_name, p2_name)
+    except Exception:
+        return {}
+
+
+@app.route("/odds_status")
+def odds_status():
+    info = remaining_requests()
+    return jsonify({
+        "odds_api_enabled": bool(os.environ.get("ODDS_API_KEY")),
+        "cached_matches":   len(_odds_cache["data"]),
+        "api_requests":     info,
     })
 
 
