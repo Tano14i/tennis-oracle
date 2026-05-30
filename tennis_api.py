@@ -92,7 +92,7 @@ Perché: [1 riga]
 
 Tono: vivace, diretto, giornalistico. Massimo 300 parole."""
 
-        model    = genai.GenerativeModel("gemini-2.0-flash")
+        model    = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content(prompt)
         narrative = response.text.strip()
         return narrative if narrative else None
