@@ -24,19 +24,18 @@ def explain_winner(p1_name, p2_name, p1_stats, p2_stats, p1_surf, p2_surf,
     """Genera motivazione per il mercato Winner."""
     reasons = []
 
-    r1 = p1_stats.get("p_rank", 200)
-    r2 = p2_stats.get("p_rank", 200)
     wr1 = p1_stats.get("p_win_rate", 0.5)
     wr2 = p2_stats.get("p_win_rate", 0.5)
     surf_key = f"wr_{surface.lower()}"
     s1 = p1_surf.get(surf_key, 0.5)
     s2 = p2_surf.get(surf_key, 0.5)
 
-    # Ranking
-    if r1 < r2:
-        reasons.append(f"{p1_name} ranking superiore (#{int(r1)} vs #{int(r2)})")
-    else:
-        reasons.append(f"{p2_name} ranking superiore (#{int(r2)} vs #{int(r1)})")
+    # Win rate generale
+    wr_diff = wr1 - wr2
+    if abs(wr_diff) >= 0.08:
+        better = p1_name if wr_diff > 0 else p2_name
+        worse  = p2_name if wr_diff > 0 else p1_name
+        reasons.append(f"{better} win rate superiore ({max(wr1,wr2)*100:.0f}% vs {min(wr1,wr2)*100:.0f}% su ATP)")
 
     # Win rate superficie
     surf_diff = s1 - s2

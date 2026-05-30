@@ -67,44 +67,41 @@ def generate_narrative(p1_name, p2_name, tournament, surface, tour,
         surf_it    = surf_names.get(surface, surface)
 
         import datetime
-        anno_corrente = datetime.datetime.now().year
+        now = datetime.datetime.now()
+        data_oggi = now.strftime("%d %B %Y")
 
         prompt = f"""Sei un analista sportivo tennis. Scrivi un'analisi in italiano stile Sisal/Snai.
 
-REGOLE IMPORTANTI:
-- Anno corrente: {anno_corrente}. Non usare mai anni passati nel testo.
-- I dati ML sotto sono VERIFICATI e hanno precedenza su qualsiasi tua conoscenza pregressa.
-- Non contraddire i dati ML forniti.
-- Per ogni affermazione che fai, devi indicare la fonte tra parentesi: [Fonte: dati ML], [Fonte: conoscenza generale], o [Fonte: non documentato].
-- Se non hai dati recenti verificabili su un giocatore, scrivi esplicitamente "dati recenti non documentati".
+REGOLE CRITICHE — RISPETTA SEMPRE:
+1. Data di oggi: {data_oggi}. Usa SEMPRE questa data e questo anno ({now.year}). Mai anni passati.
+2. Il dataset ML contiene SOLO match ATP/WTA ufficiali (non Challenger/ITF). Giocatori forti nei Challenger potrebbero avere statistiche ATP più basse del loro reale livello su una superficie.
+3. I dati ML hanno precedenza su ogni tua conoscenza pregressa. Non contraddirli.
+4. Per ogni affermazione usa la fonte: [ML] per dati ML, [CG] per conoscenza generale, [ND] per non documentato.
+5. Se un dato ti sembra inaffidabile (es. win rate molto basso per un giocatore conosciuto), segnalalo con [dato ML limitato].
 
-DATI ML VERIFICATI:
-PARTITA: {p1_name} vs {p2_name}
-TORNEO: {tournament or tour} | {surf_it} | {round_str} | Best of {best_of}
-FAVORITO: {favorite} ({win_pct}% prob. vittoria) [Fonte: dati ML]
-H2H: {h2h_str} [Fonte: dati ML]
-{p1_name}: win rate {p1_stats_resp['win_rate']:.0f}%, ultimi 5 match {p1_stats_resp['recent_wr']:.0f}%, streak {p1_stats_resp['streak']:+d}, {surf_it} {p1_stats_resp['surf_wr']:.0f}% [Fonte: dati ML]
-{p2_name}: win rate {p2_stats_resp['win_rate']:.0f}%, ultimi 5 match {p2_stats_resp['recent_wr']:.0f}%, streak {p2_stats_resp['streak']:+d}, {surf_it} {p2_stats_resp['surf_wr']:.0f}% [Fonte: dati ML]
-MERCATI: {" | ".join(f"{m['bet_label']} {m['bet_prob']:.0f}% conf.{m['confidence']}" for m in markets_objs)}
+DATI ML (solo match ATP ufficiali):
+Partita: {p1_name} vs {p2_name} — {tournament or tour} | {surf_it} | {round_str} | Best of {best_of}
+Favorito: {favorite} {win_pct}% [ML]
+H2H nel dataset ATP: {h2h_str} [ML]
+{p1_name}: win rate ATP {p1_stats_resp['win_rate']:.0f}%, ultimi 5 {p1_stats_resp['recent_wr']:.0f}%, streak {p1_stats_resp['streak']:+d}, {surf_it} {p1_stats_resp['surf_wr']:.0f}% [ML]
+{p2_name}: win rate ATP {p2_stats_resp['win_rate']:.0f}%, ultimi 5 {p2_stats_resp['recent_wr']:.0f}%, streak {p2_stats_resp['streak']:+d}, {surf_it} {p2_stats_resp['surf_wr']:.0f}% [ML]
+Mercati: {" | ".join(f"{m['bet_label']} {m['bet_prob']:.0f}% conf.{m['confidence']}" for m in markets_objs)}
 
-Formato ESATTO (mantieni emoji, includi le fonti):
+Formato ESATTO (mantieni emoji e struttura):
 
-🎾 {p1_name} vs {p2_name} — [Torneo {anno_corrente} Round]
-🏆 Favorito: [nome] — [1 frase vivace sul perché, con fonte]
+🎾 {p1_name} vs {p2_name} — [Torneo {now.year} Round]
+🏆 Favorito: [nome] — [1 frase, fonte inline]
 📊 Analisi:
-[2-3 righe con fonti inline: es. "forma recente al 80% [ML]", "stile di gioco aggressivo [conoscenza generale]"]
-💰 Scommessa principale: [bet]
+[2-3 righe su forma, tattica, superficie con fonti inline tra parentesi quadre]
+💰 Scommessa principale: [bet dal mercato ML più forte]
 Perché: [2 righe con fonti]
 Confidenza: [ALTA/MEDIA/BASSA]
-💡 Scommessa alternativa: [bet]
+💡 Scommessa alternativa: [bet diverso]
 Perché: [1 riga con fonte]
-⚠️ Attenzione: [1 rischio con fonte]
+⚠️ Attenzione: [1 rischio concreto con fonte]
+📋 Fonti: ML (metriche usate) | CG: [info giocatori dalla tua conoscenza, o "nessuna verificata"] | ND: [affermazioni non documentate, o "nessuna"]
 
-📋 Fonti usate:
-- Dati ML: [elenca metriche usate]
-- Conoscenza generale: [elenca cosa sai sui giocatori o lascia "nessuna informazione verificata disponibile"]
-
-Massimo 350 parole. Tono vivace e diretto."""
+Massimo 350 parole. Tono vivace."""
 
         # Chiama Gemini REST API direttamente (evita problemi di versione SDK)
         model = "gemini-2.5-flash"
@@ -319,6 +316,7 @@ def _analyze_inner():
         "data_quality":     data_quality,
         "quality_warnings": quality_warnings,
         "tournament":       tournament,
+        "dataset_note":     "Statistiche calcolate su match ATP/WTA ufficiali. Challenger e ITF non inclusi.",
     })
 
 
