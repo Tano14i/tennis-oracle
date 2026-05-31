@@ -121,7 +121,14 @@ def run_backtest():
             try:
                 prob = float(model.predict_proba(X)[0][1])
                 pred = 1 if prob >= 0.5 else 0
-            except Exception:
+            except Exception as ex:
+                if not hasattr(run_backtest, '_err_shown'):
+                    run_backtest._err_shown = True
+                    import traceback as _tb
+                    print(f"\n[DEBUG] Errore predict_proba ({market}): {ex}")
+                    print(f"  X columns: {list(X.columns)}")
+                    print(f"  X values: {X.values}")
+                    print(_tb.format_exc()[:500])
                 continue
 
             results[market]["y_true"].append(y_true)
