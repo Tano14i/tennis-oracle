@@ -240,7 +240,7 @@ async function checkApi() {
   el.className = "api-status api-warn";
   el.textContent = "⏳ Connessione API…";
   try {
-    const r = await fetch(API_URL + "/health", {signal: AbortSignal.timeout(20000)});
+    const r = await fetch(API_URL + "/health", {signal: AbortSignal.timeout(60000)});
     if (r.ok) {
       const d = await r.json();
       apiReady = true;
@@ -542,18 +542,33 @@ async function analyzeSelected() {
   btn.classList.add("loading");
   btn.textContent = "⏳ Analisi in corso...";
 
+  const payload = {
+    p1: m.p1, p2: m.p2,
+    surface: m.surface, tour: m.tour,
+    round: m.round, tournament: m.tournament || "",
+    best_of: m.tour === "WTA" ? 3 : 3
+  };
+
   try {
-    const res = await fetch(API_URL + "/analyze", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        p1: m.p1, p2: m.p2,
-        surface: m.surface, tour: m.tour,
-        round: m.round, tournament: m.tournament || "",
-        best_of: m.tour === "WTA" ? 3 : 3
-      }),
-      signal: AbortSignal.timeout(25000)
-    });
+    let res;
+    try {
+      res = await fetch(API_URL + "/analyze", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(30000)
+      });
+    } catch(e) {
+      // Timeout o errore di rete — probabile cold start HF. Retry con attesa.
+      btn.textContent = "⏳ Sveglio l'API... (attendere ~60s)";
+      await new Promise(r => setTimeout(r, 5000));
+      res = await fetch(API_URL + "/analyze", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(90000)
+      });
+    }
 
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
