@@ -683,7 +683,9 @@ function renderAnalysis(d) {
     if (conf === "alta")  { cardClass = "green";  confClass = "conf-alta"; }
     if (conf === "media") { cardClass = "yellow"; confClass = "conf-media"; }
 
-    const isNoBet = conf === "bassa" || Math.abs(mk.prob - 0.5) < 0.05;
+    // In BO5, soglia NO BET più bassa per sets_over (mercato più rilevante)
+    const noBetThresh = (isBO5 && key === "sets_over") ? 0.03 : 0.05;
+    const isNoBet = conf === "bassa" || Math.abs(mk.prob - 0.5) < noBetThresh;
     const barWidth = Math.round(Math.abs(mk.bet_prob - 50) * 2);
     const reasons = (mk.reasons || []).map(r => `<div class="market-reason">• ${r}</div>`).join("");
     const altHtml = mk.alt_label
