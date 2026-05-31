@@ -22,8 +22,9 @@ from datetime import datetime
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 
-from tennis_dataset import download_dataset, enrich_dataframe, build_player_stats_lookup, build_surface_stats
-from tennis_models import MODELS_DIR, FEATURE_COLS_BASE, FEATURE_COLS_WINNER, build_row, build_h2h_lookup
+from tennis_dataset import (download_dataset, enrich_dataframe, build_player_stats_lookup,
+                            build_surface_stats, build_h2h_lookup)
+from tennis_models import MODELS_DIR, FEATURE_COLS_BASE, FEATURE_COLS_WINNER, build_row
 
 # ---------------------------------------------------------------------------
 # Config
@@ -41,7 +42,7 @@ CONF_THRESHOLD = 0.62           # soglia per contare come "high confidence pick"
 def run_backtest():
     print("=" * 60)
     print("TENNIS ORACLE — BACKTESTING")
-    print(f"Periodo test: {BACKTEST_FROM} → oggi")
+    print(f"Periodo test: {BACKTEST_FROM} -> oggi")
     print(f"Quota simulata: {FLAT_ODDS} | Soglia confidenza: {CONF_THRESHOLD}")
     print("=" * 60)
 
@@ -88,7 +89,6 @@ def run_backtest():
 
     # Costruisci feature per il test set
     print(f"\nCalcolo predizioni su {len(df_test):,} match di test...")
-    from tennis_models import build_row, FEATURE_COLS_WINNER, FEATURE_COLS_BASE
 
     TARGET_MAP = {
         "winner":     "target_winner",

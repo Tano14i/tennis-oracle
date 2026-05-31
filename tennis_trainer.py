@@ -26,9 +26,9 @@ def run_training():
     print("TENNIS ORACLE — TRAINING")
     print("=" * 50)
 
-    print("\n[1/4] Download dataset Sackmann (ATP + WTA)...")
+    print("\n[1/4] Download dataset Sackmann (ATP + WTA + Challenger)...")
     t0 = time.time()
-    df = download_dataset()
+    df = download_dataset(include_challenger=True, include_futures=False)
     print(f"      Partite scaricate: {len(df)} ({time.time()-t0:.1f}s)")
 
     if len(df) < 1000:

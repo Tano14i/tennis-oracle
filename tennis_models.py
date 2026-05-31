@@ -30,7 +30,8 @@ LEVEL_MAP = {"G": 4, "M": 3, "A": 2, "P": 1, "PM": 1, "D": 0, "F": 2, "I": 1, "O
 ROUND_MAP = {"F": 7, "SF": 6, "QF": 5, "R16": 4, "R32": 3, "R64": 2, "R128": 1, "RR": 3}
 
 # Mercati con lift positivo — mostrati nel report
-RELIABLE_MARKETS = ["winner", "both_set", "games_over", "aces_over"]
+# both_set rimosso: lift negativo (-0.038) nel backtesting
+RELIABLE_MARKETS = ["winner", "games_over", "aces_over"]
 
 # Mercati deboli — addestrati ma nascosti nel report
 ALL_MARKETS = ["winner", "both_set", "games_over", "aces_over", "sets_over", "tiebreak"]
