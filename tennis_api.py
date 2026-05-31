@@ -285,7 +285,7 @@ def _analyze_inner():
         elif market == "games_over":
             reasons = explain_games(p1_name, p2_name, p1_stats, p2_stats, surface, prob)
         elif market == "aces_over":
-            reasons = explain_aces(p1_name, p2_name, p1_stats, p2_stats, surface, prob)
+            reasons = explain_aces(p1_name, p2_name, p1_stats, p2_stats, surface, prob, best_of)
         elif market == "tiebreak":
             reasons = explain_tiebreak(p1_name, p2_name, p1_stats, p2_stats, surface, prob)
         else:

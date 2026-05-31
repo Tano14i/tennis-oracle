@@ -139,20 +139,26 @@ def explain_games(p1_name, p2_name, p1_stats, p2_stats, surface, prob_over):
     return reasons
 
 
-def explain_aces(p1_name, p2_name, p1_stats, p2_stats, surface, prob_over):
+def explain_aces(p1_name, p2_name, p1_stats, p2_stats, surface, prob_over, best_of=3):
     """Genera motivazione per Aces Over/Under."""
     reasons = []
 
     a1 = p1_stats.get("p_aces_avg", 5.0)
     a2 = p2_stats.get("p_aces_avg", 5.0)
-    total = a1 + a2
+    total_bo3 = a1 + a2
 
-    reasons.append(f"Media aces: {p1_name} {a1:.1f}/match, {p2_name} {a2:.1f}/match (totale atteso {total:.1f})")
-
-    ht1 = p1_stats.get("p_ht", 185)
-    ht2 = p2_stats.get("p_ht", 185)
-    if max(ht1, ht2) >= 196:
-        reasons.append(f"Giocatore alto presente — servizio potente favorisce gli aces")
+    # Aggiusta per BO5: moltiplica per il rapporto set medi attesi
+    if best_of == 5:
+        total_expected = round(total_bo3 * (5 / 3), 1)
+        reasons.append(
+            f"Media aces/match BO3: {p1_name} {a1:.1f}, {p2_name} {a2:.1f} "
+            f"→ atteso ~{total_expected} aces in Bo5 (~{total_bo3:.1f}×5/3)"
+        )
+    else:
+        reasons.append(
+            f"Media aces: {p1_name} {a1:.1f}/match, {p2_name} {a2:.1f}/match "
+            f"(totale atteso {total_bo3:.1f})"
+        )
 
     if surface == "Grass":
         reasons.append("Erba massimizza gli aces (+30% rispetto alla media su altre superfici)")
