@@ -374,6 +374,56 @@ def odds_status():
     })
 
 
+@app.route("/value_bets_today")
+def value_bets_today():
+    """Restituisce tutti i value bet trovati sulle partite di oggi."""
+    if not MODELS_READY:
+        return jsonify({"error": "Modelli non caricati"}), 503
+    try:
+        odds = _get_cached_odds()
+        if not odds:
+            return jsonify({"value_bets": [], "message": "Nessuna quota disponibile"})
+
+        results = []
+        for match_odd in odds:
+            p1 = match_odd["home_team"]
+            p2 = match_odd["away_team"]
+            p1_id = find_player_id(p1, name_lookup) or -1
+            p2_id = find_player_id(p2, name_lookup) or -2
+
+            try:
+                predictions, h2h, h2h_surf = predict_match(
+                    p1_id, p2_id, "Hard", "A", "R32", 3,
+                    player_stats, surface_stats, df_history
+                )
+            except Exception:
+                continue
+
+            vbs = find_value_bets(predictions, [match_odd], p1, p2)
+            real_vbs = {k: v for k, v in vbs.items() if v.get("has_value")}
+            if real_vbs:
+                results.append({
+                    "p1": p1, "p2": p2,
+                    "commence_time": match_odd.get("commence_time", ""),
+                    "value_bets": real_vbs,
+                    "winner_prob": round(predictions.get("winner", {}).get("prob", 0.5), 3),
+                })
+
+        # Ordina per edge massimo
+        results.sort(key=lambda x: max(
+            (v.get("edge", 0) for v in x["value_bets"].values()), default=0
+        ), reverse=True)
+
+        return jsonify({
+            "value_bets": results,
+            "total_matches_scanned": len(odds),
+            "value_bets_found": len(results),
+            "requests_remaining": remaining_requests(),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+
+
 # ---------------------------------------------------------------------------
 # Endpoint narrativa separato (chiamato dal frontend dopo i risultati ML)
 # ---------------------------------------------------------------------------
