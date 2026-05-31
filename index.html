@@ -157,6 +157,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 <div id="pager" class="pager"></div>
 
+<!-- Value Bets Today -->
+<div id="valueBetsTodaySection" style="display:none;padding:12px 16px">
+  <div style="font-size:11px;font-weight:600;color:#1b5e20;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">💰 Value Bets del giorno</div>
+  <div id="valueBetsTodayList"></div>
+</div>
+
 <!-- Top 5 Picks -->
 <div id="top5Section" style="display:none;padding:12px 16px">
   <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">⭐ Top 5 picks del giorno</div>
@@ -380,6 +386,7 @@ async function loadSchedule() {
     } else {
       applyFilters();
       computeTop5();
+      loadValueBetsToday();
     }
   } catch(e) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div>Errore di connessione.<br><small>' + e.message + '</small></div>';
@@ -432,6 +439,38 @@ function render() {
 }
 
 function goPage(p) { page = p; render(); }
+
+// ---- Value Bets Today (The Odds API) ----
+async function loadValueBetsToday() {
+  try {
+    const res = await fetch(API_URL + "/value_bets_today", {signal: AbortSignal.timeout(15000)});
+    if (!res.ok) return;
+    const d = await res.json();
+    if (!d.value_bets || !d.value_bets.length) return;
+
+    const section = document.getElementById("valueBetsTodaySection");
+    const list    = document.getElementById("valueBetsTodayList");
+    section.style.display = "block";
+
+    list.innerHTML = d.value_bets.map(item => {
+      const vbs = Object.values(item.value_bets);
+      return vbs.map(vb => `
+        <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer"
+             onclick="selectMatchByName('${item.p1}','${item.p2}')">
+          <div style="font-size:11px;color:#1b5e20;font-weight:600;margin-bottom:4px">💰 ${vb.market || 'Winner'}</div>
+          <div style="font-size:14px;font-weight:500;margin-bottom:4px">${item.p1} vs ${item.p2}</div>
+          <div style="font-size:13px;color:#2e7d32">
+            ${vb.bet_label} @ <strong>${vb.odds ? vb.odds.toFixed(2) : '?'}</strong>
+            · Edge: <strong>+${(vb.edge*100).toFixed(1)}%</strong>
+            · EV: +${(vb.ev*100).toFixed(1)}%
+          </div>
+          <div style="font-size:11px;color:#388e3c;margin-top:2px">Half-Kelly: ${(vb.kelly*100).toFixed(1)}% bankroll · ${vb.bookmaker}</div>
+        </div>`).join("");
+    }).join("");
+  } catch(e) {
+    // Silenzioso se non disponibile
+  }
+}
 
 // ---- Top 5 picks del giorno ----
 async function computeTop5() {
@@ -696,13 +735,35 @@ function renderAnalysis(d) {
       ? `<div class="market-alt">Alternativa: ${mk.alt_label} <span class="alt-prob">${mk.alt_prob.toFixed(0)}%</span></div>`
       : "";
 
-    // Value bet block (solo per Winner, solo quando c'è edge positivo)
-    const vb = (key === "winner" && d.value_bets) ? (d.value_bets["winner_p1"] || d.value_bets["winner_p2"]) : null;
-    const valueBetHtml = vb ? `<div class="value-bet">
-      <div class="value-bet-label">💰 VALUE BET — ${vb.bet_label}</div>
-      <div class="value-bet-edge">Quota: <strong>${vb.odds.toFixed(2)}</strong> | Prob ML: ${(vb.ml_prob*100).toFixed(0)}% | Prob implicita: ${(vb.implied_prob*100).toFixed(0)}% | Edge: <strong>+${(vb.edge*100).toFixed(1)}%</strong></div>
-      <div class="value-bet-kelly">Kelly suggerito: ${(vb.kelly*100).toFixed(1)}% bankroll (${vb.bookmaker})</div>
-    </div>` : "";
+    // Quote reali e value bet (Winner + Totals)
+    let valueBetHtml = "";
+    if (key === "winner" && d.value_bets) {
+      const vb    = d.value_bets["winner_p1"] || d.value_bets["winner_p2"];
+      const odds  = d.value_bets["_odds_only"];
+      if (vb && vb.has_value) {
+        valueBetHtml = `<div class="value-bet">
+          <div class="value-bet-label">💰 VALUE BET — ${vb.bet_label}</div>
+          <div class="value-bet-edge">Quota: <strong>${vb.odds.toFixed(2)}</strong> · ML: ${(vb.ml_prob*100).toFixed(0)}% · Implicita: ${(vb.implied_prob*100).toFixed(0)}% · Edge: <strong>+${(vb.edge*100).toFixed(1)}%</strong></div>
+          <div class="value-bet-kelly">Half-Kelly: ${(vb.kelly*100).toFixed(1)}% bankroll · ${vb.bookmaker}</div>
+        </div>`;
+      } else if (odds) {
+        // Mostra le quote anche senza edge (trasparenza)
+        valueBetHtml = `<div class="value-bet" style="background:#f5f5f5;border-left-color:#bbb">
+          <div style="font-size:11px;color:#888">📊 Quote reali (${odds.bookmaker}): <strong>${odds.home_team} ${odds.home_odds.toFixed(2)}</strong> · <strong>${odds.away_team} ${odds.away_odds.toFixed(2)}</strong></div>
+          <div style="font-size:11px;color:#aaa">${odds.message}</div>
+        </div>`;
+      }
+    }
+    if (key === "games_over" && d.value_bets) {
+      const vb = d.value_bets["totals_over"] || d.value_bets["totals_under"];
+      if (vb && vb.has_value) {
+        valueBetHtml = `<div class="value-bet">
+          <div class="value-bet-label">💰 VALUE BET — ${vb.bet_label}</div>
+          <div class="value-bet-edge">Quota: <strong>${vb.odds.toFixed(2)}</strong> · ML: ${(vb.ml_prob*100).toFixed(0)}% · Implicita: ${(vb.implied_prob*100).toFixed(0)}% · Edge: <strong>+${(vb.edge*100).toFixed(1)}%</strong></div>
+          <div class="value-bet-kelly">Half-Kelly: ${(vb.kelly*100).toFixed(1)}% bankroll · ${vb.bookmaker}</div>
+        </div>`;
+      }
+    }
 
     return `<div class="market-card ${cardClass}">
       <div class="market-title">${mk.title}</div>
