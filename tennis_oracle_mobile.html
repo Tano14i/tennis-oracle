@@ -308,8 +308,11 @@ async function loadSchedule() {
     const endpoints = [
       ["https://site.api.espn.com/apis/site/v2/sports/tennis/atp/scoreboard?dates=" + d, "ATP"],
       ["https://site.api.espn.com/apis/site/v2/sports/tennis/wta/scoreboard?dates=" + d, "WTA"],
+      // Challenger — vari path ESPN da provare
       ["https://site.api.espn.com/apis/site/v2/sports/tennis/atp-challenger/scoreboard?dates=" + d, "Challenger"],
       ["https://site.api.espn.com/apis/site/v2/sports/tennis/challenger/scoreboard?dates=" + d, "Challenger"],
+      ["https://site.api.espn.com/apis/site/v2/sports/tennis/tennis-challenger/scoreboard?dates=" + d, "Challenger"],
+      // ITF
       ["https://site.api.espn.com/apis/site/v2/sports/tennis/itf-men/scoreboard?dates=" + d, "ITF"],
       ["https://site.api.espn.com/apis/site/v2/sports/tennis/itf-women/scoreboard?dates=" + d, "ITF"],
       ["https://site.api.espn.com/apis/site/v2/sports/tennis/itf/scoreboard?dates=" + d, "ITF"],
@@ -656,11 +659,21 @@ function renderAnalysis(d) {
     : "H2H: Nessun precedente nel dataset";
 
   // Mercati
+  const isBO5 = d.best_of === 5;
   const order = ["winner", "both_set", "games_over", "aces_over", "sets_over", "tiebreak"];
   const grid = document.getElementById("marketsGrid");
   grid.innerHTML = order.map(key => {
     const mk = d.markets[key];
     if (!mk) return "";
+
+    // Nascondi games_over in BO5: la soglia 22.5 è per BO3.
+    // In un Grand Slam (BO5) il minimo teorico è ~36 game.
+    if (key === "games_over" && isBO5) return `<div class="market-card grey">
+      <div class="market-title">${mk.title}</div>
+      <div class="nobet-label">N/A — soglia 22.5 valida solo per Best of 3</div>
+      <div class="market-reason" style="font-size:11px;margin-top:4px">In un Grand Slam (Bo5) il range tipico è 36-55 game totali. Questo mercato richiede una soglia dedicata.</div>
+    </div>`;
+
     const conf = mk.confidence;
     const show = mk.show;
 

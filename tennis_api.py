@@ -238,13 +238,17 @@ def _analyze_inner():
         "p2_wins": h2h.get("h2h_total", 0) - h2h.get("h2h_p1_wins", 0),
     }
 
+    # Per BO5 (Grand Slam) usa soglia 38.5 invece di 22.5
+    games_threshold = "38.5" if best_of == 5 else "22.5"
+    aces_threshold  = "17.5" if best_of == 5 else "10.5"
+
     market_labels = {
-        "winner":     {"title": "Winner",                    "yes": f"{p1_name} vince",      "no": f"{p2_name} vince"},
-        "both_set":   {"title": "Entrambi vincono un set",   "yes": "Sì",                    "no": "No — vittoria netta"},
-        "games_over": {"title": "Games Over/Under 22.5",     "yes": "Over 22.5",             "no": "Under 22.5"},
-        "aces_over":  {"title": "Aces Over/Under 10.5",      "yes": "Over 10.5",             "no": "Under 10.5"},
-        "sets_over":  {"title": "Set Over/Under 2.5",        "yes": "Over 2.5 set",          "no": "Under 2.5 set"},
-        "tiebreak":   {"title": "Tiebreak (almeno 1)",       "yes": "Sì — almeno 1 tiebreak","no": "No tiebreak"},
+        "winner":     {"title": "Winner",                                   "yes": f"{p1_name} vince",      "no": f"{p2_name} vince"},
+        "both_set":   {"title": "Entrambi vincono un set",                  "yes": "Sì",                    "no": "No — vittoria netta"},
+        "games_over": {"title": f"Games Over/Under {games_threshold}",      "yes": f"Over {games_threshold}","no": f"Under {games_threshold}"},
+        "aces_over":  {"title": f"Aces Over/Under {aces_threshold}",        "yes": f"Over {aces_threshold}", "no": f"Under {aces_threshold}"},
+        "sets_over":  {"title": "Set Over/Under 2.5",                       "yes": "Over 2.5 set",          "no": "Under 2.5 set"},
+        "tiebreak":   {"title": "Tiebreak (almeno 1)",                      "yes": "Sì — almeno 1 tiebreak","no": "No tiebreak"},
     }
 
     h2h_surf = get_h2h_on_surface(df_history, p1_id, p2_id, surface)
@@ -254,7 +258,11 @@ def _analyze_inner():
         prob     = pred.get("prob", 0.5)
         prob_pct = pred.get("prob_pct", 50.0)
         conf     = pred.get("confidence", "bassa")
+        # In BO5 (Grand Slam): mostra sets_over invece di games_over (soglie diverse)
+        # games_over soglia 22.5 non ha senso in BO5 — nascosto nel frontend
         reliable = market in RELIABLE_MARKETS
+        if best_of == 5 and market == "sets_over":
+            reliable = True   # "Over 3.5 set" è valido e utile in Grand Slam
         labels   = market_labels.get(market, {"title": market, "yes": "Sì", "no": "No"})
 
         if prob >= 0.5:

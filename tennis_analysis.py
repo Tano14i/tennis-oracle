@@ -79,39 +79,62 @@ def explain_sets(p1_name, p2_name, p1_stats, p2_stats, surface, best_of, prob_ov
     elif wr_diff < 0.06:
         reasons.append(f"Win rate simili ({wr1*100:.0f}% vs {wr2*100:.0f}%) — match equilibrato")
 
-    # Superficie
-    if surface == "Clay":
-        reasons.append("Su terra i match tendono ad essere più lunghi e combattuti")
-    elif surface == "Grass":
-        reasons.append("Su erba i match spesso si decidono in fretta (servizio dominante)")
+    going_over = prob_over >= 0.5
+
+    # Superficie — coerente con la direzione
+    if surface == "Clay" and going_over:
+        reasons.append("Terra: scambi lunghi aumentano probabilità di terzo set")
+    elif surface == "Clay" and not going_over:
+        reasons.append("Terra ma match con netto favorito: vittoria attesa in due set netti")
+    elif surface == "Grass" and not going_over:
+        reasons.append("Erba: servizio dominante, match spesso risolto in due set")
+    elif surface == "Grass" and going_over:
+        reasons.append("Erba con servizi vulnerabili: atteso terzo set")
 
     # Best of 5
-    if best_of == 5:
-        reasons.append("Formato Best of 5: più opportunità di rimonta per l'outsider")
+    if best_of == 5 and going_over:
+        reasons.append("Formato Bo5: maggiore probabilità di match lungo (Over 3.5 set)")
+    elif best_of == 5 and not going_over:
+        reasons.append("Formato Bo5 ma divario netto: vittoria in tre set possibile")
 
     return reasons
 
 
 def explain_games(p1_name, p2_name, p1_stats, p2_stats, surface, prob_over):
-    """Genera motivazione per Games Over/Under."""
+    """Genera motivazione per Games Over/Under 22.5 (solo BO3)."""
     reasons = []
+    going_over = prob_over >= 0.5
 
     s1_1st = p1_stats.get("p_1st_won", 0.70)
     s2_1st = p2_stats.get("p_1st_won", 0.70)
     s1_2nd = p1_stats.get("p_2nd_won", 0.50)
     s2_2nd = p2_stats.get("p_2nd_won", 0.50)
-
     avg_hold = (s1_1st + s2_1st + s1_2nd + s2_2nd) / 4
 
-    if avg_hold > 0.72:
-        reasons.append(f"Entrambi forti al servizio — alto hold rate atteso (più game)")
-    elif avg_hold < 0.62:
-        reasons.append(f"Servizi vulnerabili — attesi molti break (meno game)")
+    # Motivo servizio — coerente con la direzione
+    if avg_hold > 0.72 and going_over:
+        reasons.append(f"Entrambi forti al servizio → più hold, più game totali")
+    elif avg_hold < 0.62 and not going_over:
+        reasons.append(f"Servizi vulnerabili → molti break, set brevi")
+    elif avg_hold > 0.72 and not going_over:
+        reasons.append(f"Servizi solidi ma atteso match rapido per divario di livello")
+    elif avg_hold < 0.62 and going_over:
+        reasons.append(f"Servizi vulnerabili ma match equilibrato → attesi scambi lunghi")
 
-    if surface == "Grass":
-        reasons.append("Erba favorisce il servizio: meno break, meno game totali")
-    elif surface == "Clay":
-        reasons.append("Terra favorisce lo scambio: più game, più break")
+    # Motivo superficie — coerente con la direzione
+    if surface == "Grass" and not going_over:
+        reasons.append("Erba favorisce servizio e punti rapidi: meno game totali")
+    elif surface == "Grass" and going_over:
+        reasons.append("Erba ma servizi non dominanti: attesi più scambi del solito")
+    elif surface == "Clay" and going_over:
+        reasons.append("Terra: scambi lunghi e più break favoriscono game totali elevati")
+    elif surface == "Clay" and not going_over:
+        reasons.append("Terra ma match con netto favorito: vittoria attesa in tre set rapidi")
+    elif surface == "Hard":
+        if going_over:
+            reasons.append("Cemento: superficie equilibrata, match atteso combattuto")
+        else:
+            reasons.append("Cemento veloce: punti rapidi favoriscono Under")
 
     return reasons
 
