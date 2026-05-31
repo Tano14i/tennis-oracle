@@ -83,6 +83,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .market-reason{font-size:12px;color:#555;line-height:1.4}
 .market-alt{margin-top:8px;font-size:12px;color:#888;border-top:1px solid #eee;padding-top:6px}
 .alt-prob{font-weight:600;color:#aaa}
+.value-bet{margin-top:8px;padding:8px 10px;background:#e8f5e9;border-radius:6px;border-left:3px solid #2e7d32;font-size:12px}
+.value-bet-label{font-weight:600;color:#1b5e20;font-size:13px}
+.value-bet-edge{color:#2e7d32;font-size:11px;margin-top:2px}
+.value-bet-kelly{color:#388e3c;font-size:11px}
 
 .narrative-block{background:#fafafa;border:1px solid #e8e8e8;border-radius:12px;padding:16px;margin-bottom:16px;font-size:14px;line-height:1.7;color:#222;white-space:pre-wrap;word-wrap:break-word}
 .narrative-loading{text-align:center;padding:20px;color:#888;font-size:13px;font-style:italic}
@@ -692,6 +696,14 @@ function renderAnalysis(d) {
       ? `<div class="market-alt">Alternativa: ${mk.alt_label} <span class="alt-prob">${mk.alt_prob.toFixed(0)}%</span></div>`
       : "";
 
+    // Value bet block (solo per Winner, solo quando c'è edge positivo)
+    const vb = (key === "winner" && d.value_bets) ? (d.value_bets["winner_p1"] || d.value_bets["winner_p2"]) : null;
+    const valueBetHtml = vb ? `<div class="value-bet">
+      <div class="value-bet-label">💰 VALUE BET — ${vb.bet_label}</div>
+      <div class="value-bet-edge">Quota: <strong>${vb.odds.toFixed(2)}</strong> | Prob ML: ${(vb.ml_prob*100).toFixed(0)}% | Prob implicita: ${(vb.implied_prob*100).toFixed(0)}% | Edge: <strong>+${(vb.edge*100).toFixed(1)}%</strong></div>
+      <div class="value-bet-kelly">Kelly suggerito: ${(vb.kelly*100).toFixed(1)}% bankroll (${vb.bookmaker})</div>
+    </div>` : "";
+
     return `<div class="market-card ${cardClass}">
       <div class="market-title">${mk.title}</div>
       ${isNoBet
@@ -704,7 +716,8 @@ function renderAnalysis(d) {
            </div>
            <div class="prob-bar-wrap"><div class="prob-bar" style="width:${barWidth}%"></div></div>
            ${reasons ? `<div class="market-reasons">${reasons}</div>` : ""}
-           ${altHtml}`
+           ${altHtml}
+           ${valueBetHtml}`
       }
     </div>`;
   }).join("");
