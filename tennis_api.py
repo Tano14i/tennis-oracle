@@ -247,7 +247,9 @@ def _analyze_inner():
         "both_set":   {"title": "Entrambi vincono un set",                  "yes": "Sì",                    "no": "No — vittoria netta"},
         "games_over": {"title": f"Games Over/Under {games_threshold}",      "yes": f"Over {games_threshold}","no": f"Under {games_threshold}"},
         "aces_over":  {"title": f"Aces Over/Under {aces_threshold}",        "yes": f"Over {aces_threshold}", "no": f"Under {aces_threshold}"},
-        "sets_over":  {"title": "Set Over/Under 2.5",                       "yes": "Over 2.5 set",          "no": "Under 2.5 set"},
+        "sets_over":  {"title": f"Set Over/Under {'3.5' if best_of==5 else '2.5'}",
+                       "yes": f"Over {'3.5' if best_of==5 else '2.5'} set (4+ set)",
+                       "no":  f"Under {'3.5' if best_of==5 else '2.5'} set ({'3-0' if best_of==5 else '2-0'})"},
         "tiebreak":   {"title": "Tiebreak (almeno 1)",                      "yes": "Sì — almeno 1 tiebreak","no": "No tiebreak"},
     }
 
@@ -263,6 +265,9 @@ def _analyze_inner():
         reliable = market in RELIABLE_MARKETS
         if best_of == 5 and market == "sets_over":
             reliable = True   # "Over 3.5 set" è valido e utile in Grand Slam
+            # Promuovi a "media" se abbastanza lontano da 50% (>55%)
+            if conf == "bassa" and abs(prob - 0.5) >= 0.08:
+                conf = "media"
         labels   = market_labels.get(market, {"title": market, "yes": "Sì", "no": "No"})
 
         if prob >= 0.5:

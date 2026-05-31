@@ -81,21 +81,23 @@ def explain_sets(p1_name, p2_name, p1_stats, p2_stats, surface, best_of, prob_ov
 
     going_over = prob_over >= 0.5
 
-    # Superficie — coerente con la direzione
+    # Superficie — coerente con la direzione e con best_of
+    min_sets = 3 if best_of == 5 else 2
+    threshold = "3.5" if best_of == 5 else "2.5"
     if surface == "Clay" and going_over:
-        reasons.append("Terra: scambi lunghi aumentano probabilità di terzo set")
+        reasons.append(f"Terra: scambi lunghi aumentano probabilità di match lungo (Over {threshold})")
     elif surface == "Clay" and not going_over:
-        reasons.append("Terra ma match con netto favorito: vittoria attesa in due set netti")
+        reasons.append(f"Terra ma divario netto: vittoria rapida attesa ({min_sets}-0 o {min_sets}-1, Under {threshold})")
     elif surface == "Grass" and not going_over:
-        reasons.append("Erba: servizio dominante, match spesso risolto in due set")
+        reasons.append(f"Erba: servizio dominante favorisce match breve (Under {threshold})")
     elif surface == "Grass" and going_over:
-        reasons.append("Erba con servizi vulnerabili: atteso terzo set")
+        reasons.append(f"Erba con servizi vulnerabili: atteso match lungo (Over {threshold})")
 
-    # Best of 5
+    # Best of 5 — ragioni specifiche (minimo 3 set, quindi "over 3.5" = 4+ set)
     if best_of == 5 and going_over:
-        reasons.append("Formato Bo5: maggiore probabilità di match lungo (Over 3.5 set)")
+        reasons.append("Formato Bo5: con giocatori equilibrati attesi 4-5 set (Over 3.5)")
     elif best_of == 5 and not going_over:
-        reasons.append("Formato Bo5 ma divario netto: vittoria in tre set possibile")
+        reasons.append("Formato Bo5 ma divario netto: vittoria 3-0 o 3-1 probabile (Under 3.5)")
 
     return reasons
 
