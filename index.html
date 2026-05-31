@@ -385,6 +385,7 @@ async function loadSchedule() {
       document.getElementById("countLabel").textContent = "";
     } else {
       applyFilters();
+      loadChallengerSchedule();
       computeTop5();
       loadValueBetsToday();
     }
@@ -439,6 +440,61 @@ function render() {
 }
 
 function goPage(p) { page = p; render(); }
+
+// ---- Challenger/ITF via Sofascore (no API key) ----
+async function loadChallengerSchedule() {
+  try {
+    const picker  = document.getElementById("datePicker");
+    const dateISO = picker.value || new Date().toISOString().slice(0,10);
+    const url = `https://api.sofascore.com/api/v1/sport/tennis/scheduled-events/${dateISO}`;
+    const res = await fetch(url, {signal: AbortSignal.timeout(10000)});
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const surfMap = {"Clay":"Clay","Hard":"Hard","Grass":"Grass","Indoor hard":"Hard","Carpet":"Hard"};
+    const seen = new Set(all.map(m => [m.p1,m.p2].sort().join("|")));
+    let added = 0;
+
+    for (const ev of data.events || []) {
+      const tName = ev.tournament?.name || "";
+      const cat   = ev.tournament?.category?.name || "";
+      let tour = null;
+      if (/challenger/i.test(cat+tName)) tour = "Challenger";
+      else if (/itf/i.test(cat+tName))   tour = "ITF";
+      if (!tour) continue;
+
+      const st = ev.status?.type || "";
+      if (!["notstarted","inprogress"].includes(st)) continue;
+
+      const p1 = ev.homeTeam?.name || "";
+      const p2 = ev.awayTeam?.name || "";
+      if (!p1 || !p2) continue;
+      const key = [p1,p2].sort().join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const surface = surfMap[ev.tournament?.groundType] || "Hard";
+      const ts      = ev.startTimestamp;
+      const time    = ts ? new Date(ts*1000).toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"})+" UTC" : "";
+      all.push({p1, p2, tournament:tName, surface, tour, round: ev.roundInfo?.name||"", time});
+      added++;
+    }
+
+    if (added > 0) {
+      const sel = document.getElementById("fTournament");
+      const ex  = new Set([...sel.options].map(o=>o.value));
+      all.filter(m=>m.tour==="Challenger"||m.tour==="ITF").forEach(m=>{
+        if (!ex.has(m.tournament)) {
+          const o = document.createElement("option");
+          o.value = m.tournament; o.textContent = m.tournament;
+          sel.appendChild(o); ex.add(m.tournament);
+        }
+      });
+      applyFilters();
+      showToast(`+${added} partite Challenger/ITF`);
+    }
+  } catch(e) { /* Sofascore non raggiungibile */ }
+}
 
 // ---- Value Bets Today (The Odds API) ----
 async function loadValueBetsToday() {
