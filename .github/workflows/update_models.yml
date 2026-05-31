@@ -1,4 +1,4 @@
-name: Update ML Models Monthly
+name: Monthly Model Update
 
 on:
   schedule:
@@ -6,57 +6,92 @@ on:
     - cron: "0 3 1 * *"
   workflow_dispatch:  # trigger manuale da GitHub Actions UI
 
+permissions:
+  contents: write
+
 jobs:
   retrain:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository (con LFS)
         uses: actions/checkout@v4
         with:
           lfs: true
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Python
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install pandas numpy scikit-learn joblib requests pyarrow
+          pip install pandas numpy scikit-learn joblib requests pyarrow beautifulsoup4
 
       - name: Download latest data (ATP + WTA + Challenger)
         run: |
           python - <<'EOF'
-          import sys
+          import sys, os
           sys.path.insert(0, ".")
           from tennis_dataset import download_dataset
-          print("Scaricamento dati (ATP + WTA + Challenger)...")
+          print("Scaricamento dati ATP + WTA + Challenger...")
           df = download_dataset(force=True, include_challenger=True, include_futures=False)
-          print(f"Dataset: {len(df):,} match scaricati")
+          print(f"Dataset: {len(df):,} match")
           EOF
 
-      - name: Retrain models
-        run: |
-          python tennis_trainer.py
+      - name: Retrain all models
+        run: python tennis_trainer.py
 
       - name: Run backtesting
-        run: |
-          python tennis_backtest.py 2>&1 | tee backtest_results.txt
+        run: python tennis_backtest.py > backtest_results.txt 2>&1 || true
+        continue-on-error: true
 
-      - name: Commit updated models
+      - name: Show backtest summary
+        run: cat backtest_results.txt || echo "Backtest non completato"
+
+      - name: Setup Git LFS
+        run: |
+          git lfs install
+          git lfs track "models/*.pkl"
+
+      - name: Commit updated models to GitHub
         run: |
           git config user.name  "Tennis Oracle Bot"
           git config user.email "bot@tennis-oracle.com"
-          git add models/*.pkl backtest_results.txt backtest_picks.csv || true
-          git diff --staged --quiet || git commit -m "Monthly model update $(date '+%Y-%m-%d')"
-          git push
+          git add models/*.pkl backtest_results.txt .gitattributes || true
+          git diff --staged --quiet && echo "Nessuna modifica" || \
+            git commit -m "Monthly model update $(date '+%Y-%m-%d')"
+          git push origin master || git push origin HEAD
 
-      - name: Push models to Hugging Face Space
+      - name: Deploy updated models to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git remote add space https://Fabio14i:${HF_TOKEN}@huggingface.co/spaces/Fabio14i/tennis-oracle-api || true
-          git push space main --force
+          # Crea deploy branch orfano con solo i file necessari
+          git checkout --orphan hf_deploy_tmp
+          git rm -rf --cached . > /dev/null 2>&1 || true
+
+          # Configura LFS
+          echo "models/*.pkl filter=lfs diff=lfs merge=lfs -text" > .gitattributes
+          git lfs install
+
+          # Aggiungi solo i file di deployment
+          git add .gitattributes \
+            Dockerfile Procfile README.md requirements.txt \
+            tennis_api.py tennis_dataset.py tennis_models.py \
+            tennis_config.py tennis_analysis.py tennis_odds.py \
+            models/
+
+          git commit -m "Deploy: model update $(date '+%Y-%m-%d')"
+
+          # Push su HF Space
+          git remote add space \
+            https://Fabio14i:${HF_TOKEN}@huggingface.co/spaces/Fabio14i/tennis-oracle-api \
+            2>/dev/null || true
+          git push space hf_deploy_tmp:main --force
+
+          echo "Deploy completato!"
