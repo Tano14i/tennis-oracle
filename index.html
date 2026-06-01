@@ -186,6 +186,51 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div id="datasetNote" style="margin-top:10px;font-size:11px;color:#aaa;text-align:center">Analisi ML su match ATP/WTA ufficiali · Challenger/ITF non inclusi · narrativa Gemini AI</div>
   </div>
 
+  <!-- Validatore scommessa -->
+  <div class="step-box" id="betValidatorBox">
+    <div class="step-title">🎯 Valida la tua scommessa</div>
+    <div class="manual-form">
+      <div class="row2">
+        <input type="text" id="vP1" placeholder="Giocatore 1">
+        <input type="text" id="vP2" placeholder="Giocatore 2">
+      </div>
+      <div class="row2">
+        <select id="vTour">
+          <option value="ATP">ATP</option>
+          <option value="WTA">WTA</option>
+          <option value="Challenger">Challenger</option>
+        </select>
+        <select id="vSurf">
+          <option value="Clay">🟤 Terra</option>
+          <option value="Hard">🔵 Cemento</option>
+          <option value="Grass">🟢 Erba</option>
+        </select>
+      </div>
+      <input type="text" id="vTournament" placeholder="Torneo (es. Roland Garros)">
+      <div class="row2">
+        <select id="vRound">
+          <option value="R64">R64</option>
+          <option value="R32">R32</option>
+          <option value="R16">R16</option>
+          <option value="QF">QF</option>
+          <option value="SF">SF</option>
+          <option value="F">F</option>
+        </select>
+        <select id="vMarket">
+          <option value="winner">Winner</option>
+          <option value="sets_over">Set Over/Under</option>
+          <option value="games_over">Games Over/Under</option>
+          <option value="aces_over">Aces Over/Under</option>
+          <option value="both_set">Entrambi vincono un set</option>
+          <option value="tiebreak">Tiebreak</option>
+        </select>
+      </div>
+      <input type="text" id="vBet" placeholder="La tua scommessa (es. Sinner vince, Over 2.5 set…)">
+      <button class="btn-add" id="btnValidate" onclick="validateMyBet()">🎯 Analizza questa scommessa</button>
+    </div>
+    <div id="validationResult" style="margin-top:12px"></div>
+  </div>
+
   <!-- Aggiungi partita manuale -->
   <div class="step-box">
     <div class="step-title">➕ Aggiungi partita</div>
@@ -607,6 +652,71 @@ function selectMatch(idx) {
   document.getElementById("btnAnalyze").disabled = false;
   render();
   document.getElementById("btnAnalyze").scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
+// ---- Validatore scommessa ----
+async function validateMyBet() {
+  const p1       = document.getElementById("vP1").value.trim();
+  const p2       = document.getElementById("vP2").value.trim();
+  const tour     = document.getElementById("vTour").value;
+  const surface  = document.getElementById("vSurf").value;
+  const tournament = document.getElementById("vTournament").value.trim();
+  const round    = document.getElementById("vRound").value;
+  const market   = document.getElementById("vMarket").value;
+  const userBet  = document.getElementById("vBet").value.trim();
+
+  if (!p1 || !p2 || !userBet) {
+    showToast("⚠️ Inserisci giocatori e scommessa");
+    return;
+  }
+
+  const btn = document.getElementById("btnValidate");
+  const res = document.getElementById("validationResult");
+  btn.disabled = true;
+  btn.textContent = "⏳ Analisi in corso...";
+  res.innerHTML = `<div class="narrative-loading">🎯 Gemini sta valutando la tua scommessa…</div>`;
+
+  try {
+    // Prima chiama /validate_bet per ML + validazione
+    const r = await fetch(API_URL + "/validate_bet", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        p1, p2, surface, tour, round,
+        tournament: tournament.toLowerCase(),
+        best_of: tour === "WTA" ? 3 : 3,
+        user_bet: userBet,
+        user_bet_market: market
+      }),
+      signal: AbortSignal.timeout(60000)
+    });
+
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+
+    if (d.validation) {
+      // Determina colore verdetto
+      const txt = d.validation;
+      const isBuona     = /BUONA BET/i.test(txt);
+      const isSconsig   = /SCONSIGLIATA/i.test(txt);
+      const borderColor = isBuona ? "#2e7d32" : isSconsig ? "#b71c1c" : "#f57f17";
+      const bgColor     = isBuona ? "#f1f8f1" : isSconsig ? "#ffebee" : "#fff8e1";
+      const icon        = isBuona ? "✅" : isSconsig ? "❌" : "⚠️";
+
+      res.innerHTML = `
+        <div style="border:2px solid ${borderColor};background:${bgColor};border-radius:12px;padding:16px;font-size:14px;line-height:1.7;color:#222;white-space:pre-wrap;word-wrap:break-word">
+          <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">${icon} Analisi ML + Gemini</div>
+          ${txt.replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+        </div>`;
+    } else {
+      res.innerHTML = `<div style="color:#888;font-size:13px">Analisi ML completata ma narrativa non disponibile.</div>`;
+    }
+  } catch(e) {
+    res.innerHTML = `<div style="color:#b71c1c;font-size:13px">⚠️ Errore: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🎯 Analizza questa scommessa";
+  }
 }
 
 function addManual() {
