@@ -907,10 +907,20 @@ function renderAnalysis(d) {
       const vb    = d.value_bets["winner_p1"] || d.value_bets["winner_p2"];
       const odds  = d.value_bets["_odds_only"];
       if (vb && vb.has_value) {
-        valueBetHtml = `<div class="value-bet">
-          <div class="value-bet-label">💰 VALUE BET — ${vb.bet_label}</div>
+        // Contrarian = value bet sull'underdog (<30% ML) che va contro il modello
+        const isContrarian = vb.ml_prob < 0.30;
+        const vbBg     = isContrarian ? "#fff8e1" : "#e8f5e9";
+        const vbBorder = isContrarian ? "#f57f17" : "#2e7d32";
+        const vbIcon   = isContrarian ? "⚠️ VALUE CONTRARIAN" : "💰 VALUE BET";
+        const vbColor  = isContrarian ? "#7a5c00" : "#1b5e20";
+        const vbWarn   = isContrarian
+          ? `<div style="font-size:11px;color:#b45309;margin-top:3px">Vai CONTRO il ML — il bookmaker è molto più convinto (${(vb.implied_prob*100).toFixed(0)}% vs ML ${(vb.ml_prob*100).toFixed(0)}%). Rischio elevato.</div>`
+          : "";
+        valueBetHtml = `<div class="value-bet" style="background:${vbBg};border-left-color:${vbBorder}">
+          <div class="value-bet-label" style="color:${vbColor}">${vbIcon} — ${vb.bet_label}</div>
           <div class="value-bet-edge">Quota: <strong>${vb.odds.toFixed(2)}</strong> · ML: ${(vb.ml_prob*100).toFixed(0)}% · Implicita: ${(vb.implied_prob*100).toFixed(0)}% · Edge: <strong>+${(vb.edge*100).toFixed(1)}%</strong></div>
           <div class="value-bet-kelly">Half-Kelly: ${(vb.kelly*100).toFixed(1)}% bankroll · ${vb.bookmaker}</div>
+          ${vbWarn}
         </div>`;
       } else if (odds) {
         // Mostra le quote anche senza edge (trasparenza)
