@@ -1,0 +1,8 @@
+============================================================
+TENNIS ORACLE — BACKTESTING
+Periodo test: 2024-01-01 -> oggi
+Quota simulata: 1.9 | Soglia confidenza: 0.62
+============================================================
+
+Caricamento dataset...
+Errore: dataset vuoto
