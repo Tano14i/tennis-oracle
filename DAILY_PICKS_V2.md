@@ -143,3 +143,25 @@ containing final scores: https://github.com/Tano14i/tennis-oracle/actions/runs/4
 The source is **quarantined**, not used for model training, quote
 history or Daily Picks. A standalone quality scanner is provided in
 tennis_source_audit.py with unit tests, but it does not import data.
+
+
+## Verified milestone: 2026-11-10
+
+- Latest tested branch: 41 offline unit tests passed:
+  https://github.com/Tano14i/tennis-oracle/actions/runs/42791023562
+- Full-size 250-tree chronological holdout finished successfully:
+  https://github.com/Tano14i/tennis-oracle/actions/runs/42784958627
+- Winner model, unseen 2024–2026 matches: 41,100 evaluated;
+  accuracy **65.30%** vs rank-only accuracy **62.54%**;
+  Brier **0.21515** vs base-rate Brier **0.24990**.
+- Historical evaluation only. **Not a real-money win rate**; this
+  evaluation does not include contemporaneous bookmaker prices or ROI.
+- Last historical archive match in this test: **2026-06-01**. It is
+  too stale for live daily suggestions under the freshness gate.
+- The investigated 2026 external source was rejected after detecting
+  four future-dated matches already carrying final scores:
+  https://github.com/Tano14i/tennis-oracle/actions/runs/42785830368
+- The source is NOT imported into training or price history.
+- Deployment is NOT performed by this branch. Do not merge/deploy
+  before a clean and licensed current results source, refreshed models,
+  live API checks and credential rotation.
