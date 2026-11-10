@@ -1,0 +1,28 @@
+name: HF Tennis Data Quarantine Audit
+on:
+  push:
+    branches:
+      - feature/daily-picks-engine-v2
+    paths:
+      - '.github/workflows/hf_source_integrity_audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate external data, without ingestion
+        run: python tennis_hf_audit.py
+      - name: Preserve audit even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hf-source-integrity
+          path: hf_source_audit.json
+          retention-days: 7
