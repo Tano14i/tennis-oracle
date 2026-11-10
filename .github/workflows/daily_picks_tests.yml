@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install network-client dependency for offline parser tests
+        run: python -m pip install requests
       - name: Compile Python modules
         run: python -m py_compile tennis_daily_picks.py tennis_daily_tracker.py tennis_api.py tennis_models.py tennis_trainer.py tennis_odds.py tennis_schedule.py
       - name: Check browser JavaScript syntax

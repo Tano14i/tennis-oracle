@@ -263,12 +263,11 @@ def _analyze_inner():
         # In BO5 (Grand Slam): mostra sets_over invece di games_over (soglie diverse)
         # games_over soglia 22.5 non ha senso in BO5 — nascosto nel frontend
         reliable = market in RELIABLE_MARKETS
-        if best_of == 5 and market == "sets_over":
-            reliable = True   # "Over 3.5 set" è valido e utile in Grand Slam
-            # Promuovi a "media" se abbastanza lontano da 50% (>55%)
-            if conf == "bassa" and abs(prob - 0.5) >= 0.08:
-                conf = "media"
-        labels   = market_labels.get(market, {"title": market, "yes": "Sì", "no": "No"})
+        # Training labels are BO3-only for games 22.5 and the set/ace
+        # BO5 labels are not calibrated; never offer these as BO5 bets.
+        if best_of == 5:
+            reliable = market == "winner"
+         labels   = market_labels.get(market, {"title": market, "yes": "Sì", "no": "No"})
 
         if prob >= 0.5:
             bet_label, bet_prob = labels["yes"], prob_pct

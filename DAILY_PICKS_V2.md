@@ -74,3 +74,8 @@ esplicitamente contrassegnate come **manuali**: il ROI non prova la
 correttezza degli esiti né rappresenta operazioni realmente piazzate.
 Un disco temporaneo della piattaforma cancellerà lo storico: non
 considerarlo persistente senza volume adeguato.
+
+Historical sources: the original Sackmann URLs return 404 in 2026. The
+loader now defaults to the archived CC BY-NC-SA non-commercial mirror
+(Aneeshers/tennis-sackmann-archive). This is NOT a live results feed;
+inspect freshness and licensing before training and any commercial use.
