@@ -5,6 +5,7 @@ on:
       - feature/daily-picks-engine-v2
     paths:
       - '.github/workflows/hf_source_integrity_audit.yml'
+      - 'tennis_hf_audit.py'
   workflow_dispatch:
 permissions:
   contents: read

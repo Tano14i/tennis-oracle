@@ -31,11 +31,12 @@ def audit_csv(content, now):
     missing=sorted(REQUIRED-set(reader.fieldnames or []))
     out={"rows":0,"missing_columns":missing,"duplicates":0,"invalid_players":0,
          "invalid_dates":0,"future_settled":0,"odds_mismatch":0,
-         "closing_pairs":0,"latest_start_utc":None,"accepted":False}
+         "closing_pairs":0,"latest_start_utc":None,"recent_examples":[],"accepted":False}
     if missing:
         return out
     seen=set()
     latest=None
+    recent=[]
     for r in reader:
         out["rows"]+=1
         mid=(r.get("match_id") or "").strip()
@@ -51,6 +52,12 @@ def audit_csv(content, now):
             out["invalid_dates"]+=1
         else:
             latest=max(latest,dt) if latest else dt
+            recent.append((dt, {
+                "date_utc": dt.isoformat(),
+                "winner": r.get("winner_name"),
+                "loser": r.get("loser_name"),
+                "score": r.get("score"),
+            }))
             if r.get("score") and dt>now:
                 out["future_settled"]+=1
         probability=_float(r.get("winner_close_prob"))
@@ -61,6 +68,7 @@ def audit_csv(content, now):
         b=_float(r.get("loser_best_close_odds"))
         if a and b and 1<a<150 and 1<b<150:
             out["closing_pairs"]+=1
+    out["recent_examples"]=[x[1] for x in sorted(recent, key=lambda x: x[0])[-3:]]
     out["latest_start_utc"]=latest.isoformat() if latest else None
     out["accepted"]=out["rows"]>=100 and not any(out[k] for k in
         ("duplicates","invalid_players","invalid_dates","future_settled","odds_mismatch"))
