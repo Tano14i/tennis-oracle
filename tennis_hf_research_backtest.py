@@ -142,7 +142,19 @@ def fit_and_evaluate(frame, closings, n_estimators=250):
     truth = y[test]
     rank = X.loc[test, "rank_diff"].to_numpy(dtype=float)
     rank_accuracy = float(np.mean((rank <= 0) == truth))
-    test_ids = pack["raw"].loc[test, "source_id"].tolist()
+    raw_test = pack["raw"].loc[test]
+    w_rank = pd.to_numeric(raw_test["winner_rank"], errors="coerce")
+    l_rank = pd.to_numeric(raw_test["loser_rank"], errors="coerce")
+    rank_known = (
+        w_rank.notna().to_numpy() & l_rank.notna().to_numpy() &
+        (w_rank.to_numpy() > 0) & (l_rank.to_numpy() > 0)
+    )
+    rank_known_n = int(rank_known.sum())
+    rank_accuracy_known = (
+        float(np.mean((rank[rank_known] <= 0) == truth[rank_known]))
+        if rank_known_n else None
+    )
+    test_ids = raw_test["source_id"].tolist()
 
     joint_index = []
     closing_prob = []
@@ -170,6 +182,14 @@ def fit_and_evaluate(frame, closings, n_estimators=250):
         "test_last_day": str(pack["dates"][test].max().date()),
         "winner_model_full_holdout": evaluate_probabilities(truth, prob),
         "rank_only_accuracy_full_holdout": round(rank_accuracy, 5),
+        "rank_baseline_diagnostics": {
+            "both_ranks_known": rank_known_n,
+            "rank_coverage": round(rank_known_n / int(test.sum()), 5),
+            "rank_only_accuracy_both_known":
+                round(rank_accuracy_known, 5) if rank_accuracy_known is not None else None,
+            "unknown_rank_count": int(test.sum()) - rank_known_n,
+            "note": "Missing ranks use 300 fallback, making rank-only overall accuracy misleading.",
+        },
         "bookmaker_closing_common_subset": {
             "subset_n": len(joint_index),
             "model": evaluate_probabilities(truth[joint_index], prob[joint_index])

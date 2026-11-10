@@ -5,6 +5,7 @@ on:
       - feature/daily-picks-engine-v2
     paths:
       - '.github/workflows/hf_winner_research_backtest.yml'
+      - 'tennis_hf_research_backtest.py'
   workflow_dispatch:
 
 permissions:
