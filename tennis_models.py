@@ -14,6 +14,7 @@ Mercati deboli (nascosti dal report):
 """
 
 import os
+from functools import lru_cache
 import joblib
 import numpy as np
 import pandas as pd
@@ -276,6 +277,12 @@ def train_all_models(df, player_stats, surface_stats):
     return results
 
 
+@lru_cache(maxsize=16)
+def _cached_model(model_path, modified_at):
+    """Load each fitted model once per process and model file version."""
+    return joblib.load(model_path)
+
+
 def predict_match(p1_id, p2_id, surface, level, round_str, best_of,
                   player_stats, surface_stats, df_history):
     from tennis_dataset import get_h2h, get_h2h_on_surface
@@ -317,7 +324,7 @@ def predict_match(p1_id, p2_id, surface, level, round_str, best_of,
             predictions[market] = {"prob": 0.5, "confidence": "bassa", "reliable": False}
             continue
         try:
-            model = joblib.load(model_path)
+            model = _cached_model(model_path, os.path.getmtime(model_path))
             X = X_winner if market == "winner" else X_base
             prob = float(model.predict_proba(X)[0][1])
 
