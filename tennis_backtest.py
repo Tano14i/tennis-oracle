@@ -29,7 +29,7 @@ def market_y_mask(pack, market):
     if column not in raw:
         return np.zeros(len(raw), dtype=int), np.zeros(len(raw), dtype=bool)
     series = pd.to_numeric(raw[column], errors="coerce")
-    mask = series.notna().to_numpy()
+    mask = series.notna().to_numpy().copy()
     mask &= raw["best_of"].eq(3).to_numpy()
     if market == "aces_over":
         mask &= raw["w_ace"].notna().to_numpy() & raw["l_ace"].notna().to_numpy()

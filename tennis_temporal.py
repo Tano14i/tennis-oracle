@@ -254,7 +254,7 @@ def temporal_model_sets(feature_pack, train_mask, calibration_mask, n_estimators
                 continue
             y_raw = pd.to_numeric(feature_pack["raw"][col], errors="coerce")
             y = y_raw.fillna(-1).to_numpy().astype(int)
-            eligible = y_raw.notna().to_numpy()
+            eligible = y_raw.notna().to_numpy().copy()
             eligible &= feature_pack["raw"]["best_of"].eq(3).to_numpy()
             if market == "aces_over":
                 for col2 in ("w_ace", "l_ace"):
