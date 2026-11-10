@@ -28,8 +28,8 @@ fino alla verifica di quote e modello specifici.
 La scheda mostra stime non certificate dei modelli e un *quality score*
 che misura solo la disponibilità dei dati. Non equivale a probabilità di
 successo. Le quote possono cambiare o non essere puntabili.
-Mancano ancora backtesting walk-forward corretto, calibratura fuori campione,
-storico persistente con settlement e confronto di closing line.
+Mancano ancora backtesting walk-forward corretto, calibrazione fuori campione,
+settlement automatico verificato e confronto di closing line.
 
 **Non sono stati verificati rendimenti o vantaggi sui bookmaker.**
 
@@ -55,3 +55,22 @@ Controllare anche fork, copie e vecchie immagini di deploy.
 3. Confrontare calibrazione e log loss con baseline Elo.
 4. Conservare snapshot di quote/timestamp e settlement delle combinazioni.
 5. Solo dopo validare e ampliare i mercati e rimuovere l'etichetta sperimentale.
+
+## Storico cartaceo (opzionale)
+
+Impostare ORACLE_DB_PATH verso un file SQLite **su volume persistente** per
+conservare automaticamente la prima proposta di ogni categoria per giorno
+UTC. Richieste successive non riscrivono la quota originariamente registrata.
+
+- GET /daily_picks/history: storico e ROI su puntata simulata di 1 unità;
+  disabilitato senza ORACLE_DB_PATH.
+- Per registrare manualmente gli esiti, senza modificare le quote storiche:
+
+    python tennis_daily_tracker.py settle --db /path/oracle.sqlite --id 2026-11-10:single --outcomes win
+
+Per le multiple usare una voce win/loss/void per ogni selezione, nello
+stesso ordine di emissione, separata da virgole. Le liquidazioni sono
+esplicitamente contrassegnate come **manuali**: il ROI non prova la
+correttezza degli esiti né rappresenta operazioni realmente piazzate.
+Un disco temporaneo della piattaforma cancellerà lo storico: non
+considerarlo persistente senza volume adeguato.

@@ -403,7 +403,27 @@ def daily_picks():
         lambda player: strict_player_id(player, name_lookup),
         player_stats, surface_stats, now=now
     )
+    db_path = os.environ.get("ORACLE_DB_PATH", "")
+    report["tracking"] = {"enabled": bool(db_path), "new_snapshots": 0}
+    if db_path:
+        try:
+            from tennis_daily_tracker import record_report
+            report["tracking"]["new_snapshots"] = record_report(db_path, report)
+        except Exception as exc:
+            print(f"Daily tracking error: {exc}")
+            report["tracking"]["error"] = "Storico non disponibile."
     return jsonify(report)
+
+
+@app.route("/daily_picks/history", methods=["GET"])
+def daily_picks_history():
+    from tennis_daily_tracker import read_history
+    db_path = os.environ.get("ORACLE_DB_PATH", "")
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (ValueError, TypeError):
+        limit = 50
+    return jsonify(read_history(db_path, limit))
 
 
 @app.route("/odds_status")
