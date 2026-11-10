@@ -1,0 +1,43 @@
+name: Research Only — Surface Elo 2026 Holdout
+on:
+  push:
+    branches:
+      - feature/daily-picks-engine-v2
+    paths:
+      - '.github/workflows/hf_elo_research.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  elo-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install model-analysis dependencies
+        run: python -m pip install numpy pandas scikit-learn joblib requests
+      - name: Validate chronological Elo guarantees
+        run: python -m unittest tests.test_elo -v
+      - name: Benchmark Elo on post-hoc 2026 holdout
+        env:
+          ORACLE_ELO_REPORT: hf_elo_posthoc_diagnostic.json
+        run: |
+          python tennis_elo_research.py > /tmp/elo_research.log 2>&1 || {
+            tail -n 120 /tmp/elo_research.log
+            exit 1
+          }
+          cat hf_elo_posthoc_diagnostic.json
+      - name: Upload aggregate research JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hf-elo-posthoc-only
+          path: hf_elo_posthoc_diagnostic.json
+          retention-days: 7
