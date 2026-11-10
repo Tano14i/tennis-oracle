@@ -165,3 +165,32 @@ tennis_source_audit.py with unit tests, but it does not import data.
 - Deployment is NOT performed by this branch. Do not merge/deploy
   before a clean and licensed current results source, refreshed models,
   live API checks and credential rotation.
+
+
+## 2026-11-10 — New HF feed: audited, not ingested
+Workflow: https://github.com/Tano14i/tennis-oracle/actions/runs/42855324329
+
+Data integrity (four source CSV files):
+- ATP 2025: 3,001 matches; ATP 2026: 2,762
+- WTA 2025: 2,911 matches; WTA 2026: 2,690
+- Total: 11,364 match records; 11,219 with two valid best closing prices
+- Duplicate match IDs within files: 0; across files: 0
+- Unparseable fixture times: 0; future-scored results: 0
+- Invalid source player IDs: 0; inconsistent winner fair probability: 0
+- Latest start timestamp: 2026-11-08 22:05 UTC
+
+Independent spot-checks on actual dated results (not provider self-reports):
+- ATP Paris, Alcaraz defeats Shelton, 7-6(5) 7-5 on Nov 8:
+  https://www.nittoatpfinals.com/en/news/alcaraz-shelton-paris-2026-final-sunday
+- WTA Finals, Gauff defeats Pegula, 6-4 6-7(5) 6-2 on Nov 8:
+  https://www.wtatennis.com/news/4606606/dominant-third-set-lifts-gauff-past-pegula-in-fage-wta-finals-opener
+- WTA Finals, Noskova defeats Kostyuk, 6-2 6-4 on Nov 8:
+  https://www.tennis.com/tournaments/wta-finals/matches/m-kostyuk-vs-l-noskova-2026-11-08
+
+Status: automated integrity PASS; spot-check 3/3 matches consistent.
+This does NOT prove completeness, source ownership or commercial reuse
+rights; closing market prices are NOT real-time executable quotes.
+Source-specific opaque player IDs, surname-first display names and the
+publisher's Flashscore/TennisExplorer upstream attribution require
+licensing and identity harmonization review. No ingestion, new models
+or deployment was authorized by this audit.
