@@ -1,214 +1,101 @@
+"""Leakage-free out-of-sample Tennis Oracle 2.0 backtest.
+
+Train: earliest pre-2024 matches; calibrate: later disjoint pre-2024 matches;
+test: 2024 onward, NEVER used in model fitting or probability calibration.
+No fabricated flat bookmaker odds, profit or ROI.
 """
-tennis_backtest.py
-Backtesting del modello Tennis Oracle su dati storici.
-
-Uso:
-    python tennis_backtest.py
-
-Output:
-    - Accuracy per mercato
-    - Calibration (Brier score)
-    - ROI simulato contro quota flat 1.90 (margine bookmaker tipico)
-    - Log delle pick ad alta confidenza con esito reale
-"""
-
+import json
 import os
-import sys
-import joblib
+from datetime import datetime, timezone
+
 import numpy as np
 import pandas as pd
-from datetime import datetime
+from sklearn.metrics import brier_score_loss, log_loss
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, BASE_DIR)
+from tennis_dataset import download_dataset, enrich_dataframe
+from tennis_temporal import build_temporal_frame, chronological_masks, temporal_model_sets
+from tennis_models import TARGET_COLS
 
-from tennis_dataset import (download_dataset, enrich_dataframe, build_player_stats_lookup,
-                            build_surface_stats, build_h2h_lookup)
-from tennis_models import MODELS_DIR, FEATURE_COLS_BASE, FEATURE_COLS_WINNER, build_row
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
+TEST_START = os.environ.get("ORACLE_BACKTEST_START", "2024-01-01")
+OUTFILE = os.environ.get("ORACLE_BACKTEST_JSON", "backtest_results.json")
 
-BACKTEST_FROM = "2024-01-01"   # testa su questo periodo
-TRAIN_UNTIL   = "2023-12-31"   # modelli trainati su questo
-FLAT_ODDS     = 1.90            # quota simulata per ROI
-CONF_THRESHOLD = 0.62           # soglia per contare come "high confidence pick"
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+def market_y_mask(pack, market):
+    raw = pack["raw"]
+    if market == "winner":
+        return pack["y_winner"], np.ones(len(raw), dtype=bool)
+    column = TARGET_COLS[market]
+    if column not in raw:
+        return np.zeros(len(raw), dtype=int), np.zeros(len(raw), dtype=bool)
+    series = pd.to_numeric(raw[column], errors="coerce")
+    mask = series.notna().to_numpy()
+    mask &= raw["best_of"].eq(3).to_numpy()
+    if market == "aces_over":
+        mask &= raw["w_ace"].notna().to_numpy() & raw["l_ace"].notna().to_numpy()
+    return series.fillna(-1).to_numpy().astype(int), mask
+
 
 def run_backtest():
-    print("=" * 60)
-    print("TENNIS ORACLE — BACKTESTING")
-    print(f"Periodo test: {BACKTEST_FROM} -> oggi")
-    print(f"Quota simulata: {FLAT_ODDS} | Soglia confidenza: {CONF_THRESHOLD}")
-    print("=" * 60)
+    df = download_dataset(include_challenger=True, include_futures=False, strict=True)
+    if len(df) < 1000:
+        raise RuntimeError("Missing dataset: cannot claim valid backtest")
+    pack = build_temporal_frame(enrich_dataframe(df))
+    train, calibrate, test, calibration_start = chronological_masks(pack, TEST_START)
+    if int(test.sum()) < 150:
+        raise RuntimeError("Not enough untouched later matches for evaluation")
+    models, calib_metrics = temporal_model_sets(pack, train, calibrate)
+    if "winner" not in models:
+        raise RuntimeError("Cannot validate without a winner model")
 
-    # Carica dataset completo
-    print("\nCaricamento dataset...")
-    df_raw = download_dataset(include_challenger=True)
-    if df_raw.empty:
-        print("Errore: dataset vuoto")
-        return
-
-    df = enrich_dataframe(df_raw)
-    df["tourney_date"] = pd.to_datetime(df["tourney_date"])
-
-    # Split train/test
-    df_train = df[df["tourney_date"] <= TRAIN_UNTIL].copy()
-    df_test  = df[df["tourney_date"] >= BACKTEST_FROM].copy()
-
-    print(f"Train: {len(df_train):,} match | Test: {len(df_test):,} match")
-
-    if df_test.empty:
-        print("Nessun dato nel periodo di test.")
-        return
-
-    # Costruisci stats su dati di train only
-    print("Costruzione statistiche su dati di training...")
-    player_stats  = build_player_stats_lookup(df_train)
-    surface_stats = build_surface_stats(df_train)
-    h2h_lookup    = build_h2h_lookup(df_train)  # H2H su train only
-
-    # Carica modelli
-    print("Caricamento modelli...")
-    models = {}
-    for market in ["winner", "both_set", "games_over", "aces_over", "sets_over", "tiebreak"]:
-        path = os.path.join(MODELS_DIR, f"model_{market}.pkl")
-        if os.path.exists(path):
-            models[market] = joblib.load(path)
-            print(f"  OK: {market}")
-        else:
-            print(f"  MANCANTE: {market}")
-
-    if not models:
-        print("Nessun modello trovato. Esegui prima il training.")
-        return
-
-    # Costruisci feature per il test set
-    print(f"\nCalcolo predizioni su {len(df_test):,} match di test...")
-
-    TARGET_MAP = {
-        "winner":     "target_winner",
-        "both_set":   "target_both_set",
-        "games_over": "target_games_over_225",
-        "aces_over":  "target_aces_over_105",
-        "sets_over":  "target_sets_over",
-        "tiebreak":   "target_tiebreak",
+    report = {
+        "version": "chronological-v2",
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "train_last_date": str(pack["dates"][train].max().date()),
+        "calibration_start_date": calibration_start,
+        "calibration_last_date": str(pack["dates"][calibrate].max().date()),
+        "test_start": TEST_START,
+        "test_last_date": str(pack["dates"][test].max().date()),
+        "train_count": int(train.sum()),
+        "calibration_count": int(calibrate.sum()),
+        "test_count": int(test.sum()),
+        "results": {},
+        "calibration_diagnostics": calib_metrics,
+        "roi": None,
+        "roi_note": "No historical timestamped bookmaker odds: ROI intentionally not computed.",
+        "source_note": "Archival noncommercial dataset, coverage may be stale.",
     }
-
-    results = {m: {"y_true": [], "y_prob": [], "y_pred": []} for m in models}
-    high_conf_picks = []
-
-    for idx, row in df_test.iterrows():
-        feat = build_row(row, player_stats, surface_stats, flip=False,
-                         h2h_lookup=h2h_lookup, row_idx=idx)
-
-        for market, model in models.items():
-            target_col = TARGET_MAP[market]
-            if target_col not in df_test.columns:
-                continue
-
-            y_true = int(row[target_col]) if not pd.isna(row.get(target_col)) else None
-            if y_true is None:
-                continue
-
-            feat_cols = FEATURE_COLS_WINNER if market == "winner" else FEATURE_COLS_BASE
-            X = pd.DataFrame([feat])[feat_cols].fillna(0)
-
-            try:
-                prob = float(model.predict_proba(X)[0][1])
-                pred = 1 if prob >= 0.5 else 0
-            except Exception as ex:
-                if not hasattr(run_backtest, '_err_shown'):
-                    run_backtest._err_shown = True
-                    import traceback as _tb
-                    print(f"\n[DEBUG] Errore predict_proba ({market}): {ex}")
-                    print(f"  X columns: {list(X.columns)}")
-                    print(f"  X values: {X.values}")
-                    print(_tb.format_exc()[:500])
-                continue
-
-            results[market]["y_true"].append(y_true)
-            results[market]["y_prob"].append(prob)
-            results[market]["y_pred"].append(pred)
-
-            # Track high confidence picks
-            if market in ["both_set", "games_over", "aces_over"] and prob >= CONF_THRESHOLD:
-                high_conf_picks.append({
-                    "date":    str(row.get("tourney_date", ""))[:10],
-                    "market":  market,
-                    "p1":      row.get("winner_name", "?"),
-                    "p2":      row.get("loser_name", "?"),
-                    "prob":    prob,
-                    "outcome": y_true,
-                    "correct": int(pred == y_true),
-                })
-
-    # ---------------------------------------------------------------------------
-    # Report
-    # ---------------------------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("RISULTATI BACKTESTING")
-    print("=" * 60)
-
-    total_profit = 0.0
-    total_bets   = 0
-
-    for market, data in results.items():
-        if not data["y_true"]:
+    for market, model in models.items():
+        y, valid = market_y_mask(pack, market)
+        where = test & valid
+        if not where.any():
             continue
+        X = pack["X_winner"] if market == "winner" else pack["X_base"]
+        p = model.predict_proba(X.loc[where])[:, 1]
+        truth = y[where]
+        past = y[(train | calibrate) & valid]
+        base_rate = float(past.mean()) if len(past) else 0.5
+        base_prob = np.full_like(p, base_rate, dtype=float)
+        res = {
+            "tested": int(where.sum()),
+            "positive_rate": round(float(truth.mean()), 4),
+            "accuracy": round(float(np.mean((p >= .5) == truth)), 4),
+            "brier": round(float(brier_score_loss(truth, p)), 5),
+            "brier_baseline_pretest_prevalence": round(float(brier_score_loss(truth, base_prob)), 5),
+            "log_loss": round(float(log_loss(truth, p, labels=[0, 1])), 5),
+            "log_loss_baseline_pretest_prevalence": round(float(log_loss(truth, base_prob, labels=[0, 1])), 5),
+            "mean_model_probability": round(float(p.mean()), 4),
+        }
+        if market == "winner":
+            # Lower rank is better; use the ranking visible BEFORE each match.
+            rank = X.loc[where, "rank_diff"].to_numpy(dtype=float)
+            res["ranking_baseline_accuracy"] = round(float(np.mean((rank <= 0) == truth)), 4)
+        report["results"][market] = res
 
-        y_true = np.array(data["y_true"])
-        y_prob = np.array(data["y_prob"])
-        y_pred = np.array(data["y_pred"])
-
-        n          = len(y_true)
-        accuracy   = np.mean(y_pred == y_true)
-        # Brier score (0=perfetto, 0.25=random)
-        brier      = np.mean((y_prob - y_true) ** 2)
-        base_rate  = y_true.mean()
-        brier_base = np.mean((base_rate - y_true) ** 2)
-        brier_lift = brier_base - brier  # positivo = meglio del baseline
-
-        # ROI simulato: scommetti 1 unità ogni volta che prob >= 0.55
-        bet_mask   = y_prob >= CONF_THRESHOLD
-        n_bets     = bet_mask.sum()
-        if n_bets > 0:
-            wins    = (y_true[bet_mask] == 1).sum()
-            profit  = wins * FLAT_ODDS - n_bets
-            roi_pct = profit / n_bets * 100
-            total_profit += profit
-            total_bets   += n_bets
-        else:
-            roi_pct = 0
-            profit  = 0
-
-        marker = "OK" if brier_lift > 0 else "!!"
-        print(f"\n[{marker}] {market.upper()}")
-        print(f"  Match: {n:,} | Accuracy: {accuracy:.1%} | Base rate: {base_rate:.1%}")
-        print(f"  Brier: {brier:.4f} (lift vs baseline: {brier_lift:+.4f})")
-        print(f"  Picks conf>{CONF_THRESHOLD}: {n_bets} | Vincenti: {wins if n_bets>0 else 0}")
-        print(f"  ROI simulato @ {FLAT_ODDS}: {roi_pct:+.1f}% ({profit:+.2f} unità su {n_bets} bet)")
-
-    print(f"\n{'='*60}")
-    print(f"TOTALE: {total_bets} bet | Profitto: {total_profit:+.2f} unità")
-    if total_bets > 0:
-        print(f"ROI globale: {total_profit/total_bets*100:+.1f}%")
-
-    # Salva log pick ad alta confidenza
-    if high_conf_picks:
-        df_picks = pd.DataFrame(high_conf_picks)
-        picks_path = os.path.join(BASE_DIR, "backtest_picks.csv")
-        df_picks.to_csv(picks_path, index=False)
-        win_rate = df_picks["correct"].mean()
-        print(f"\nPick salvate: {picks_path}")
-        print(f"Win rate pick alta confidenza: {win_rate:.1%} su {len(df_picks)} pick")
-
-    print("=" * 60)
-    return results
+    with open(OUTFILE, "w", encoding="utf-8") as file:
+        json.dump(report, file, ensure_ascii=False, indent=2)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return report
 
 
 if __name__ == "__main__":
