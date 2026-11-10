@@ -203,78 +203,17 @@ def build_winner_features(df, player_stats, surface_stats, h2h_lookup=None):
     return X, np.array(targets)
 
 
-def train_all_models(df, player_stats, surface_stats):
-    from tennis_dataset import build_h2h_lookup
-    results = {}
-
-    print("  Precalcolo H2H lookup per training (no data leakage)...")
-    h2h_lookup = build_h2h_lookup(df)
-
-    # === Winner (dataset bilanciato) ===
-    print("  Training winner (dataset bilanciato)...")
-    X_w, y_w = build_winner_features(df, player_stats, surface_stats, h2h_lookup=h2h_lookup)
-    X_w = X_w.fillna(0)
-    rf_w = RandomForestClassifier(
-        n_estimators=300, max_depth=8, min_samples_leaf=10,
-        class_weight="balanced", random_state=42, n_jobs=-1,
-    )
-    model_w = CalibratedClassifierCV(rf_w, method="sigmoid", cv=5)
-    model_w.fit(X_w, y_w)
-    cv_w = cross_val_score(
-        RandomForestClassifier(n_estimators=100, max_depth=8, min_samples_leaf=10,
-                               class_weight="balanced", random_state=42, n_jobs=-1),
-        X_w, y_w, cv=5, scoring="accuracy"
-    )
-    joblib.dump(model_w, os.path.join(MODELS_DIR, "model_winner.pkl"))
-    results["winner"] = {
-        "accuracy": round(cv_w.mean(), 3),
-        "samples": len(X_w),
-        "positive_rate": 0.5,
-    }
-    print(f"    Accuracy CV: {cv_w.mean():.3f} | Baseline: 0.643 (fav vince)")
-
-    # === Altri mercati ===
-    print("  Costruzione feature matrix altri mercati...")
-    X_base = build_features(df, player_stats, surface_stats, h2h_lookup=h2h_lookup).fillna(0)
-
-    for market in ["sets_over", "both_set", "games_over", "aces_over", "tiebreak"]:
-        target_col = TARGET_COLS[market]
-        if target_col not in df.columns:
-            print(f"  {market}: colonna target non trovata, skip")
-            continue
-
-        y = df[target_col].values
-        mask = ~np.isnan(y.astype(float))
-        X_clean = X_base[mask]
-        y_clean = y[mask]
-
-        if len(X_clean) < 100 or len(set(y_clean)) < 2:
-            print(f"  {market}: dati insufficienti, skip")
-            continue
-
-        print(f"  Training {market} ({len(X_clean)} campioni)...")
-        rf = RandomForestClassifier(
-            n_estimators=300, max_depth=8, min_samples_leaf=10,
-            class_weight="balanced", random_state=42, n_jobs=-1,
-        )
-        model = CalibratedClassifierCV(rf, method="sigmoid", cv=5)
-        model.fit(X_clean, y_clean)
-        cv = cross_val_score(
-            RandomForestClassifier(n_estimators=100, max_depth=8, min_samples_leaf=10,
-                                   class_weight="balanced", random_state=42, n_jobs=-1),
-            X_clean, y_clean, cv=5, scoring="accuracy"
-        )
+def train_all_models(df, player_stats=None, surface_stats=None):
+    """Leakage-free training: retained public signature with chronological internals."""
+    from tennis_temporal import build_temporal_frame, chronological_masks, temporal_model_sets
+    pack = build_temporal_frame(df)
+    train, cal, _, _ = chronological_masks(pack, "2100-01-01")
+    models, calibration = temporal_model_sets(pack, train, cal)
+    if not models:
+        raise RuntimeError("No calibrated model produced from chronological samples")
+    for market, model in models.items():
         joblib.dump(model, os.path.join(MODELS_DIR, f"model_{market}.pkl"))
-
-        positive_rate = float(y_clean.mean())
-        results[market] = {
-            "accuracy": round(cv.mean(), 3),
-            "samples": len(X_clean),
-            "positive_rate": round(positive_rate, 3),
-        }
-        print(f"    Accuracy CV: {cv.mean():.3f} | Baseline: {max(positive_rate, 1-positive_rate):.3f}")
-
-    return results
+    return calibration
 
 
 @lru_cache(maxsize=16)
@@ -314,6 +253,22 @@ def predict_match(p1_id, p2_id, surface, level, round_str, best_of,
     feat_base["h2h_p1_win_rate"] = fake_row["_h2h_p1_win_rate"]
     feat_base["h2h_total"]       = fake_row["_h2h_total"]
 
+    # Temporal training orders players deterministically by numeric ID,
+    # rather than always putting the winning player first.
+    import json
+    manifest_path = os.path.join(MODELS_DIR, "model_manifest.json")
+    temporal = False
+    try:
+        with open(manifest_path, encoding="utf-8") as stream:
+            temporal = json.load(stream).get("feature_engine") == "temporal-v2"
+    except (OSError, ValueError):
+        pass
+    reverse = temporal and int(p1_id) > int(p2_id)
+    if reverse:
+        feat_base = build_row(fake_row, player_stats, surface_stats, flip=True)
+        feat_base["h2h_p1_win_rate"] = 1.0 - h2h.get("h2h_p1_win_rate", .5)
+        feat_base["h2h_total"] = h2h.get("h2h_total", 0)
+
     X_base = pd.DataFrame([feat_base], columns=FEATURE_COLS_BASE).fillna(0)
     X_winner = pd.DataFrame([feat_base], columns=FEATURE_COLS_WINNER).fillna(0)
 
@@ -327,6 +282,8 @@ def predict_match(p1_id, p2_id, surface, level, round_str, best_of,
             model = _cached_model(model_path, os.path.getmtime(model_path))
             X = X_winner if market == "winner" else X_base
             prob = float(model.predict_proba(X)[0][1])
+            if market == "winner" and reverse:
+                prob = 1.0 - prob
 
             # Winner: affidabile solo se > 65% (chiara superiorita)
             if market == "winner":

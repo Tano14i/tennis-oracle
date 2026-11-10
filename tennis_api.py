@@ -129,7 +129,8 @@ def health():
         "status": "ok",
         "models_ready": MODELS_READY,
         "players": len(player_stats) if MODELS_READY else 0,
-        "narrative_enabled": bool(os.environ.get("GEMINI_API_KEY"))
+        "narrative_enabled": bool(os.environ.get("GEMINI_API_KEY")),
+        "daily_picks_requires_fresh_temporal_models": True
     })
 
 
@@ -376,6 +377,21 @@ def daily_picks():
     now = datetime.now(timezone.utc)
     if not MODELS_READY:
         return jsonify(empty_report(now, "Modelli non caricati: nessuna selezione.")), 503
+    # A model generated from the deleted original data source, or from a
+    # months-old archive, is NOT permitted to publish Daily Picks.
+    import json as _json
+    from datetime import date as _date
+    try:
+        with open(os.path.join(MODELS_DIR, "model_manifest.json"),
+                  encoding="utf-8") as stream:
+            manifest = _json.load(stream)
+        latest = _date.fromisoformat(manifest["training_data_latest_date"])
+    except (OSError, KeyError, TypeError, ValueError):
+        return jsonify(empty_report(now, "Modelli cronologici assenti: nuovo training richiesto."))
+    if manifest.get("feature_engine") != "temporal-v2":
+        return jsonify(empty_report(now, "Modelli legacy non validati: nessuna selezione."))
+    if (now.date() - latest).days > 21:
+        return jsonify(empty_report(now, "Dataset storico troppo vecchio: nessun pronostico pubblicato."))
     if not os.environ.get("ODDS_API_KEY"):
         return jsonify(empty_report(now, "ODDS_API_KEY assente: nessuna quota verificabile."))
     odds = _get_cached_odds()

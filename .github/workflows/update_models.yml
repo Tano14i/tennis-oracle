@@ -39,7 +39,7 @@ jobs:
           sys.path.insert(0, ".")
           from tennis_dataset import download_dataset
           print("Scaricamento dati ATP + WTA + Challenger...")
-          df = download_dataset(force=True, include_challenger=True, include_futures=False)
+          df = download_dataset(force=True, include_challenger=True, include_futures=False, strict=True)
           print(f"Dataset: {len(df):,} match")
           EOF
 
@@ -61,10 +61,10 @@ jobs:
         run: |
           git config user.name  "Tennis Oracle Bot"
           git config user.email "bot@tennis-oracle.com"
-          git add models/*.pkl backtest_results.txt .gitattributes || true
+          git add models/*.pkl models/model_manifest.json backtest_results.txt backtest_results.json .gitattributes || true
           git diff --staged --quiet && echo "Nessuna modifica" || \
             git commit -m "Monthly model update $(date '+%Y-%m-%d')"
-          git push origin master || git push origin HEAD
+          git push origin master
 
       - name: Deploy updated models to Hugging Face Space
         env:
@@ -82,7 +82,8 @@ jobs:
           git add .gitattributes \
             Dockerfile Procfile README.md requirements.txt \
             tennis_api.py tennis_dataset.py tennis_models.py \
-            tennis_config.py tennis_analysis.py tennis_odds.py \
+            tennis_config.py tennis_analysis.py tennis_odds.py tennis_schedule.py \
+            tennis_temporal.py tennis_daily_picks.py tennis_daily_tracker.py \
             models/
 
           git commit -m "Deploy: model update $(date '+%Y-%m-%d')"

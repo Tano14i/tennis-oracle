@@ -88,3 +88,25 @@ collisions are excluded from the backward-compatible player lookup.
 Train/calibration/test masks are strictly date-disjoint. The scoring
 models in this experimental version are still legacy until the trainer
 and API are explicitly switched over to newly validated artifacts.
+
+
+## Chronological model training / held-out evaluation
+
+The retraining entry point now calls the point-in-time features: previous
+dates only, deterministic player order, no winner/loser double rows.
+Training and calibration use separate periods.
+
+Run:
+    python tennis_trainer.py
+    python tennis_backtest.py
+
+The independent backtest re-fits NEW models on pre-2024 data, calibrates
+only on later pre-2024 data and evaluates untouched matches from 2024.
+It reports Brier, log loss, accuracy, and a historical rank baseline.
+It deliberately leaves ROI blank without actual timestamped bookmaker odds.
+Calibration scores are NOT independent test scores.
+
+Models created by the new trainer carry model_manifest.json. Daily Picks
+fails closed if this manifest is absent/legacy or the historical data is
+over 21 days old. The known archival mirror is too stale for trustworthy
+current-day signals until a fresh licensed data feed is available.
