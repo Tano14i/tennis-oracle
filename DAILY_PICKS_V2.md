@@ -79,3 +79,12 @@ Historical sources: the original Sackmann URLs return 404 in 2026. The
 loader now defaults to the archived CC BY-NC-SA non-commercial mirror
 (Aneeshers/tennis-sackmann-archive). This is NOT a live results feed;
 inspect freshness and licensing before training and any commercial use.
+
+## Chronological feature engine (in development)
+\`tennis_temporal.py\` builds point-in-time player features per *calendar
+day*: no same-day match outcomes feed a prediction for another fixture
+that day. ATP/WTA histories are isolated and potential legacy numeric ID
+collisions are excluded from the backward-compatible player lookup.
+Train/calibration/test masks are strictly date-disjoint. The scoring
+models in this experimental version are still legacy until the trainer
+and API are explicitly switched over to newly validated artifacts.
