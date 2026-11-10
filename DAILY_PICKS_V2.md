@@ -110,3 +110,11 @@ Models created by the new trainer carry model_manifest.json. Daily Picks
 fails closed if this manifest is absent/legacy or the historical data is
 over 21 days old. The known archival mirror is too stale for trustworthy
 current-day signals until a fresh licensed data feed is available.
+
+
+## One-off archival holdout run
+The workflow temporal_holdout_validation.yml triggers on creation or
+manual dispatch. It evaluates historical archived data with 50 trees/model
+to check the complete pipeline. This is a development smoke evaluation,
+NOT a benchmark of the default 250-tree production model. It uploads a
+JSON artifact only if the sources and processing succeed.

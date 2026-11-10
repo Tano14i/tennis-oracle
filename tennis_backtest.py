@@ -44,7 +44,8 @@ def run_backtest():
     train, calibrate, test, calibration_start = chronological_masks(pack, TEST_START)
     if int(test.sum()) < 150:
         raise RuntimeError("Not enough untouched later matches for evaluation")
-    models, calib_metrics = temporal_model_sets(pack, train, calibrate)
+    trees = int(os.environ.get("ORACLE_BACKTEST_TREES", "120"))
+    models, calib_metrics = temporal_model_sets(pack, train, calibrate, n_estimators=trees)
     if "winner" not in models:
         raise RuntimeError("Cannot validate without a winner model")
 
