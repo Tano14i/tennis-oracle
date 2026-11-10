@@ -36,7 +36,7 @@ class TrainerSmokeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.pack = build_temporal_frame(pd.DataFrame(_game(i) for i in range(330)))
-        cls.train, cls.cal, cls.test, _ = chronological_masks(cls.pack, "2023-11-27", .28)
+        cls.train, cls.cal, cls.test, _ = chronological_masks(cls.pack, "2023-11-15", .28)
 
     def test_chronological_split_fit_and_predict(self):
         models, report = temporal_model_sets(self.pack, self.train, self.cal, n_estimators=8)
