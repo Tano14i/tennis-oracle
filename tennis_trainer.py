@@ -32,8 +32,7 @@ def run_training():
     print(f"      Partite scaricate: {len(df)} ({time.time()-t0:.1f}s)")
 
     if len(df) < 1000:
-        print("ERRORE: dataset insufficiente.")
-        return
+        raise RuntimeError("Dataset insufficiente: training interrotto.")
 
     print("\n[2/4] Parsing score e calcolo target...")
     df = enrich_dataframe(df)

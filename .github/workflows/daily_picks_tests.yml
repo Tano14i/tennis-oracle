@@ -1,0 +1,23 @@
+name: Daily Picks Unit Tests
+on:
+  pull_request:
+  push:
+    branches:
+      - feature/daily-picks-engine-v2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Daily Picks stdlib tests
+        run: python -m unittest discover -s tests -p "test_*.py" -v

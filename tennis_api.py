@@ -364,6 +364,48 @@ def _get_value_bets(p1_name, p2_name, markets):
         return {}
 
 
+
+# ---------------------------------------------------------------------------
+# Tennis Oracle 2.0 — research only; never fabricate unavailable picks.
+# ---------------------------------------------------------------------------
+@app.route("/daily_picks", methods=["GET"])
+def daily_picks():
+    from datetime import datetime, timezone
+    from tennis_daily_picks import build_daily_products, empty_report, strict_player_id
+    from tennis_schedule import get_matches_today
+
+    now = datetime.now(timezone.utc)
+    if not MODELS_READY:
+        return jsonify(empty_report(now, "Modelli non caricati: nessuna selezione.")), 503
+    if not os.environ.get("ODDS_API_KEY"):
+        return jsonify(empty_report(now, "ODDS_API_KEY assente: nessuna quota verificabile."))
+    odds = _get_cached_odds()
+    if not odds:
+        return jsonify(empty_report(now, "Nessuna quota tennis disponibile dal provider."))
+
+    try:
+        matches = get_matches_today()
+    except Exception as exc:
+        print(f"Daily schedule fetch error: {exc}")
+        return jsonify(empty_report(now, "Palinsesto non raggiungibile."))
+    if not matches:
+        return jsonify(empty_report(now, "Nessuna partita verificata nel palinsesto odierno."))
+
+    def _predict(a, b, surface, level, rnd, best_of):
+        result, _, _ = predict_match(
+            a, b, surface, level, rnd, best_of,
+            player_stats, surface_stats, df_history
+        )
+        return result
+
+    report = build_daily_products(
+        matches, odds, _predict,
+        lambda player: strict_player_id(player, name_lookup),
+        player_stats, surface_stats, now=now
+    )
+    return jsonify(report)
+
+
 @app.route("/odds_status")
 def odds_status():
     info = remaining_requests()

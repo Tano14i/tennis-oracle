@@ -47,8 +47,7 @@ jobs:
         run: python tennis_trainer.py
 
       - name: Run backtesting
-        run: python tennis_backtest.py > backtest_results.txt 2>&1 || true
-        continue-on-error: true
+        run: python tennis_backtest.py > backtest_results.txt 2>&1
 
       - name: Show backtest summary
         run: cat backtest_results.txt || echo "Backtest non completato"
