@@ -29,7 +29,7 @@ jobs:
               print("HTTP",r.status,"Bytes",len(body),"Type",r.headers.get("Content-Type"))
           assert len(body) > 100000, "Unexpectedly small dataset"
           text = body.decode("utf-8-sig")
-          reader=csv.DictReader(io.StringIO(text))
+          reader=csv.DictReader(io.StringIO(text),delimiter=";")
           print("COLUMNS:", reader.fieldnames)
           rows=list(reader)
           print("ROWS:",len(rows))
@@ -42,5 +42,6 @@ jobs:
               if field in reader.fieldnames:
                   vals=[x.get(field) for x in rows]
                   print(field,"NONEMPTY:",sum(bool(x) for x in vals), "TOP:", Counter(vals).most_common(7))
+          assert all(f in reader.fieldnames for f in ("date","genre","joueur1_id","joueur2_id","vainqueur_id","cote1_ouverture","cote2_cloture")), "Expected field missing"
           print("SAMPLE:",[{key:r.get(key) for key in ("date","tournoi","joueur1","joueur2","vainqueur_id","score")} for r in rows[-2:]])
           PY
