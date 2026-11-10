@@ -258,9 +258,13 @@ def predict_match(p1_id, p2_id, surface, level, round_str, best_of,
     import json
     manifest_path = os.path.join(MODELS_DIR, "model_manifest.json")
     temporal = False
+    trained_markets = None
     try:
         with open(manifest_path, encoding="utf-8") as stream:
-            temporal = json.load(stream).get("feature_engine") == "temporal-v2"
+            metadata = json.load(stream)
+            temporal = metadata.get("feature_engine") == "temporal-v2"
+            if temporal:
+                trained_markets = set(metadata.get("trained_markets", []))
     except (OSError, ValueError):
         pass
     reverse = temporal and int(p1_id) > int(p2_id)
@@ -274,6 +278,9 @@ def predict_match(p1_id, p2_id, surface, level, round_str, best_of,
 
     predictions = {}
     for market in ALL_MARKETS:
+        if trained_markets is not None and market not in trained_markets:
+            predictions[market] = {"prob": 0.5, "confidence": "bassa", "reliable": False}
+            continue
         model_path = os.path.join(MODELS_DIR, f"model_{market}.pkl")
         if not os.path.exists(model_path):
             predictions[market] = {"prob": 0.5, "confidence": "bassa", "reliable": False}
