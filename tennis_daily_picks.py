@@ -20,7 +20,7 @@ MIN_SURFACE_MATCHES = 5
 MAX_CANDIDATES = 18
 TIERS = (
     ("single", "Singola", 1.40),
-    ("three_by_three", "3×3", 2.75),
+    ("three_by_three", "3×3", 2.70),
     ("multiple_5", "Multipla 5+", 5.00),
     ("bomb_7", "Bomba 7+", 7.00),
 )
@@ -258,7 +258,7 @@ def build_daily_products(matches, prices, predict, resolve, player_stats, surfac
         return report
 
     report["products"]["single"] = _ticket([shortlist[0]])
-    triple = _choose_combo(shortlist, (3,), 2.75, 3.0, high=3.45)
+    triple = _choose_combo(shortlist, (3,), 2.70, 3.0, high=3.45)
     report["products"]["three_by_three"] = triple or _missing("Nessuna terna attendibile vicino a quota 3.")
     multi = _choose_combo(shortlist, (3,4,5), 5.0, 5.5)
     report["products"]["multiple_5"] = multi or _missing("Non ci sono combinazioni idonee a quota 5+.")

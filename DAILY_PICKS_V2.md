@@ -2,7 +2,7 @@
 
 Questo branch aggiunge un motore **pre-match** che può creare, se disponibili:
 - **Singola:** 1 evento con quota >= 1.40.
-- **3×3:** esattamente 3 eventi, quota totale 2.75–3.45.
+- **3×3:** esattamente 3 eventi, quota totale 2.70–3.45.
 - **Multipla 5+:** da 3 a 5 eventi differenti, quota totale >= 5.
 - **Bomba 7+:** da 3 a 5 eventi differenti, quota totale >= 7.
 

@@ -42,6 +42,16 @@ class TrackerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 settle_ticket(db, ticket["ticket_id"], ["loss"])
 
+    def test_all_void_ticket_is_not_counted_as_win(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = str(Path(tmp) / "tracker.sqlite")
+            report, *_ = candidates(6)
+            record_report(db, report)
+            ticket = next(x for x in read_history(db)["tickets"] if x["category"] == "single")
+            result = settle_ticket(db, ticket["ticket_id"], ["void"])
+            self.assertEqual(result["status"], "void")
+            self.assertEqual(read_history(db)["summary"]["settled"], 0)
+
     def test_wrong_outcome_count_refused(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = str(Path(tmp) / "tracker.sqlite")

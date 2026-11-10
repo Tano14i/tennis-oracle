@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -30,14 +31,22 @@ CREATE TABLE IF NOT EXISTS oracle_tickets (
 """
 
 
+@contextmanager
 def _db(path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(str(path), timeout=10)
     db.row_factory = sqlite3.Row
-    db.execute(SCHEMA)
-    db.commit()
-    return db
+    try:
+        db.execute(SCHEMA)
+        db.commit()
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 def record_report(db_path, report):
@@ -124,7 +133,7 @@ def settle_ticket(db_path, ticket_id, outcomes):
                 payout *= float(leg["odds"]) if result == "win" else 1.0
         else:
             payout = 0.0
-        status = "won" if won else "lost"
+        status = "void" if all(x == "void" for x in outcomes) else ("won" if won else "lost")
         db.execute(
             """UPDATE oracle_tickets
                SET status=?,payout_units=?,settlement_source='manual',
