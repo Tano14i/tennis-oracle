@@ -133,3 +133,13 @@ for each trained market to expose drift. The monthly trainer fails if its
 latest historical event is older than 21 days. A manual archival research
 override exists via ORACLE_ALLOW_STALE_RESEARCH=1, but does not override
 the Daily Picks freshness gate and must never be set in production.
+
+
+## Candidate fresh feed not approved
+External Valuebetennis 2026 CSV (semicolon-delimited, CC BY 4.0)
+provided 77,908 rows and the expected odds columns. However, the
+2026-11-10 UTC audit found four future-dated match records already
+containing final scores: https://github.com/Tano14i/tennis-oracle/actions/runs/42785830368
+The source is **quarantined**, not used for model training, quote
+history or Daily Picks. A standalone quality scanner is provided in
+tennis_source_audit.py with unit tests, but it does not import data.
