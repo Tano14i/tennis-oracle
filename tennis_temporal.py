@@ -208,8 +208,8 @@ def build_temporal_frame(df):
     return {
         "raw": raw,
         "dates": pd.to_datetime(pd.Series(dates)),
-        "X_base": pd.DataFrame(feat_base, columns=FEATURE_COLS_BASE).fillna(0),
-        "X_winner": pd.DataFrame(feat_winner, columns=FEATURE_COLS_WINNER).fillna(0),
+        "X_base": pd.DataFrame(feat_base, columns=FEATURE_COLS_BASE).fillna(0).astype(float),
+        "X_winner": pd.DataFrame(feat_winner, columns=FEATURE_COLS_WINNER).fillna(0).astype(float),
         "y_winner": np.asarray(y_winner, dtype=int),
         "player_stats": last_stats,
         "surface_stats": last_surface,
