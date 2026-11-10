@@ -1,0 +1,46 @@
+name: Probe fresh CC-BY tennis results feed (one-off)
+on:
+  push:
+    branches:
+      - feature/daily-picks-engine-v2
+    paths:
+      - '.github/workflows/fresh_source_probe.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Inspect published CC BY 4.0 season CSV
+        run: |
+          python - <<'PY'
+          import csv, io, urllib.request
+          from collections import Counter
+          url = "https://www.valuebetennis.com/datasets/valuebetennis-matchs-2026.csv"
+          req = urllib.request.Request(url,headers={"User-Agent":"TennisOracleResearch/2.0 (CSV schema validation)"})
+          with urllib.request.urlopen(req, timeout=45) as r:
+              body = r.read()
+              print("HTTP",r.status,"Bytes",len(body),"Type",r.headers.get("Content-Type"))
+          assert len(body) > 100000, "Unexpectedly small dataset"
+          text = body.decode("utf-8-sig")
+          reader=csv.DictReader(io.StringIO(text))
+          print("COLUMNS:", reader.fieldnames)
+          rows=list(reader)
+          print("ROWS:",len(rows))
+          assert len(rows)>2000, "Insufficient source coverage"
+          date_key=next((col for col in ("date","Date","match_date") if col in reader.fieldnames),None)
+          if date_key:
+              dates=[x[date_key] for x in rows if x.get(date_key)]
+              print("EARLIEST/LATEST:",min(dates), max(dates))
+          for field in ("genre","categorie","surface","cote1_cloture","cote2_cloture","vainqueur_id"):
+              if field in reader.fieldnames:
+                  vals=[x.get(field) for x in rows]
+                  print(field,"NONEMPTY:",sum(bool(x) for x in vals), "TOP:", Counter(vals).most_common(7))
+          print("SAMPLE:",[{key:r.get(key) for key in ("date","tournoi","joueur1","joueur2","vainqueur_id","score")} for r in rows[-2:]])
+          PY
