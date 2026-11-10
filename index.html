@@ -200,7 +200,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="stats-row" id="statsRow"></div>
     <div class="h2h-row" id="h2hRow"></div>
     <div class="markets-grid" id="marketsGrid"></div>
-    <div id="datasetNote" style="margin-top:10px;font-size:11px;color:#aaa;text-align:center">Analisi ML su match ATP/WTA ufficiali · Challenger/ITF non inclusi · narrativa Gemini AI</div>
+    <div id="datasetNote" style="margin-top:10px;font-size:11px;color:#888;text-align:center">
+      Fonte storica: Jeff Sackmann / Tennis Abstract (CC BY-NC-SA 4.0), mirror archivistico.
+      Informazioni non aggiornate in tempo reale; uso di ricerca non commerciale.
+    </div>
   </div>
 
   <!-- Validatore scommessa -->
@@ -317,7 +320,10 @@ async function checkApi() {
       const d = await r.json();
       apiReady = true;
       el.className = "api-status api-ok";
-      el.textContent = "✓ ML attivo — " + d.players + " giocatori";
+      el.textContent = d.daily_picks_ready
+        ? "✓ ML disponibile · Daily Picks attive"
+        : "⚠ Dati ML storici · Daily Picks non disponibili";
+      if (!d.daily_picks_ready) el.className = "api-status api-warn";
     } else throw new Error("HTTP " + r.status);
   } catch(e) {
     apiReady = false;

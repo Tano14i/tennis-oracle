@@ -118,3 +118,10 @@ manual dispatch. It evaluates historical archived data with 50 trees/model
 to check the complete pipeline. This is a development smoke evaluation,
 NOT a benchmark of the default 250-tree production model. It uploads a
 JSON artifact only if the sources and processing succeed.
+
+
+## UI freshness and source notice
+The health response now exposes daily_picks_ready and a reason when
+models/data/quote access are unavailable. The frontend explicitly shows
+a historical-data warning instead of claiming fully operational daily picks.
+Historical attribution and non-commercial licensing are visible in-app.

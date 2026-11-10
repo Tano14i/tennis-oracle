@@ -125,12 +125,25 @@ Massimo 350 parole. Tono vivace."""
 
 @app.route("/health")
 def health():
+    import json as _json
+    from tennis_model_gate import daily_model_gate
+    try:
+        with open(os.path.join(MODELS_DIR, "model_manifest.json"),
+                  encoding="utf-8") as stream:
+            manifest = _json.load(stream)
+    except (OSError, ValueError):
+        manifest = None
+    gate_ok, gate_reason = daily_model_gate(manifest)
     return jsonify({
-        "status": "ok",
+        "status": "ok" if MODELS_READY else "degraded",
         "models_ready": MODELS_READY,
         "players": len(player_stats) if MODELS_READY else 0,
         "narrative_enabled": bool(os.environ.get("GEMINI_API_KEY")),
-        "daily_picks_requires_fresh_temporal_models": True
+        "daily_picks_ready": MODELS_READY and gate_ok and bool(os.environ.get("ODDS_API_KEY")),
+        "daily_picks_note": (gate_reason if not gate_ok else
+                             "Quote API non configurata." if not os.environ.get("ODDS_API_KEY")
+                             else "Modelli storici freschi e credenziali quote disponibili."),
+        "training_data_latest_date": (manifest or {}).get("training_data_latest_date"),
     })
 
 
