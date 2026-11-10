@@ -1,0 +1,34 @@
+name: ATP-WTA Historical Identity Crosswalk Research
+on:
+  push:
+    branches:
+      - feature/daily-picks-engine-v2
+    paths:
+      - '.github/workflows/hf_crosswalk_research.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  research-crosswalk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Identity matching offline tests
+        run: python -m unittest tests.test_hf_crosswalk -v
+      - name: Compare four HF files against 2025-26 historical ATP/WTA archive
+        run: python tennis_hf_crosswalk.py
+      - name: Preserve research reports even if identities are insufficient
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atp-wta-research-crosswalk-only
+          path: |
+            hf_crosswalk_report.json
+            hf_verified_crosswalk_research.json
+          retention-days: 7
