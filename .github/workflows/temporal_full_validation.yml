@@ -1,4 +1,4 @@
-name: Historical Full-Size Holdout Validation (one-off)
+name: Historical Full-Size Holdout Validation (subgroups)
 on:
   push:
     branches:
@@ -35,6 +35,6 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: tennis-chronological-backtest-v2-250trees
+          name: tennis-chronological-backtest-v2-250trees-subgroups
           path: backtest_results_v2_250trees.json
           retention-days: 14

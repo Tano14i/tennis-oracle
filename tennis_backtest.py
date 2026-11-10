@@ -91,6 +91,25 @@ def run_backtest():
             # Lower rank is better; use the ranking visible BEFORE each match.
             rank = X.loc[where, "rank_diff"].to_numpy(dtype=float)
             res["ranking_baseline_accuracy"] = round(float(np.mean((rank <= 0) == truth)), 4)
+        # Stratified reporting, to spot drift hidden by one aggregate score.
+        period_years = pack["dates"].loc[where].dt.year.to_numpy()
+        tours = pack["raw"].loc[where, "tour"].astype(str).to_numpy()
+        def _grouped(values):
+            groups = {}
+            for key in sorted(set(values)):
+                subset = values == key
+                if subset.sum() < 100:
+                    continue
+                yy, pp = truth[subset], p[subset]
+                groups[str(key)] = {
+                    "tested": int(subset.sum()),
+                    "accuracy": round(float(np.mean((pp >= .5) == yy)), 4),
+                    "brier": round(float(brier_score_loss(yy, pp)), 5),
+                    "positive_rate": round(float(yy.mean()), 4),
+                }
+            return groups
+        res["by_year"] = _grouped(period_years)
+        res["by_tour"] = _grouped(tours)
         report["results"][market] = res
 
     with open(OUTFILE, "w", encoding="utf-8") as file:

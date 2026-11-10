@@ -125,3 +125,11 @@ The health response now exposes daily_picks_ready and a reason when
 models/data/quote access are unavailable. The frontend explicitly shows
 a historical-data warning instead of claiming fully operational daily picks.
 Historical attribution and non-commercial licensing are visible in-app.
+
+
+## Performance breakdowns and stale-data deployment blocking
+The held-out JSON now includes by_year and by_tour accuracy/Brier breakdowns
+for each trained market to expose drift. The monthly trainer fails if its
+latest historical event is older than 21 days. A manual archival research
+override exists via ORACLE_ALLOW_STALE_RESEARCH=1, but does not override
+the Daily Picks freshness gate and must never be set in production.

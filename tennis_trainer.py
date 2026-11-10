@@ -21,6 +21,13 @@ def run_training():
     df = download_dataset(include_challenger=True, include_futures=False, strict=True)
     if len(df) < 1000:
         raise RuntimeError("Insufficient historical data: training interrupted.")
+    # A monthly "success" must not publish models trained on stale archives.
+    newest = pd.Timestamp(df["tourney_date"].max()).date()
+    age = (datetime.now(timezone.utc).date() - newest).days
+    if age < 0 or (age > 21 and os.environ.get("ORACLE_ALLOW_STALE_RESEARCH") != "1"):
+        raise RuntimeError(
+            f"Latest research data {newest} is {age} days old: refusing live model update"
+        )
     df = enrich_dataframe(df)
     df = df[df["n_sets"] > 0].copy()
     pack = build_temporal_frame(df)
