@@ -82,6 +82,17 @@ class PicksTests(unittest.TestCase):
         self.assertEqual(report["candidate_count"], len(matches))
         self.assertTrue(all(x["market"] == "winner" for x in report["products"]["multiple_5"]["legs"]))
 
+    def test_3x3_does_not_force_large_combined_price(self):
+        report, *_ = candidates(3, odds=1.8)
+        self.assertEqual(report["products"]["three_by_three"]["status"], "unavailable")
+
+    def test_no_false_match_with_wrong_bookmaker_identity(self):
+        _, matches, prices, stats, surf, ids, predict = candidates()
+        for p in prices:
+            p["home_team"] = "Different Person"
+        report = build_daily_products(matches, prices, predict, ids.get, stats, surf, now=NOW)
+        self.assertEqual(report["candidate_count"], 0)
+
     def test_low_sample_rejected(self):
         _, matches, prices, stats, surf, ids, predict = candidates()
         for s in stats.values():
@@ -107,7 +118,8 @@ class PicksTests(unittest.TestCase):
     def test_strict_lookup_refuses_ambiguous_surname(self):
         lookup = {"jannik sinner": 11, "john sinner": 22, "carlos alcaraz": 33}
         self.assertIsNone(strict_player_id("Sinner", lookup))
-        self.assertEqual(strict_player_id("J. Sinner", lookup), 11)
+        self.assertIsNone(strict_player_id("J. Sinner", lookup))
+        self.assertEqual(strict_player_id("Jannik Sinner", lookup), 11)
         self.assertTrue(names_match("Jannik Sinner", "J. Sinner"))
         self.assertFalse(names_match("Jannik Sinner", "John Sinner"))
 
