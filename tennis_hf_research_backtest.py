@@ -27,6 +27,7 @@ from sklearn.metrics import brier_score_loss, log_loss
 from tennis_hf_audit import NAMES, download as download_hf, _date as parse_start
 from tennis_hf_crosswalk import run as build_verified, parse_csv, score_key
 from tennis_temporal import build_temporal_frame, chronological_masks
+from tennis_rank_history import carry_forward_prior_ranks
 from tennis_models import FEATURE_COLS_WINNER
 
 TEST_FROM = "2026-06-02"
@@ -104,6 +105,8 @@ def prepare_rows(source_by_tour, mapping, now):
     if frame.empty:
         raise ValueError("No research cohort available")
     frame["tourney_date"] = pd.to_datetime(frame["tourney_date"])
+    frame, rank_diagnostics = carry_forward_prior_ranks(frame, max_age_days=70)
+    counts["causal_rank_carryforward"] = rank_diagnostics
     return frame, closings, counts
 
 
@@ -171,6 +174,8 @@ def fit_and_evaluate(frame, closings, n_estimators=250):
 
     result = {
         "model_type": "RandomForest winner, time-split sigmoid calibration",
+        "post_hoc_exploration": True,
+        "holdout_reused_not_independent_after_feature_diagnosis": True,
         "cohort": "Historically verified source IDs only; selection-biased",
         "test_start": TEST_FROM,
         "train_n": int(train.sum()),
@@ -188,7 +193,7 @@ def fit_and_evaluate(frame, closings, n_estimators=250):
             "rank_only_accuracy_both_known":
                 round(rank_accuracy_known, 5) if rank_accuracy_known is not None else None,
             "unknown_rank_count": int(test.sum()) - rank_known_n,
-            "note": "Missing ranks use 300 fallback, making rank-only overall accuracy misleading.",
+            "note": "Ranks carried forward only from real observations on earlier dates, max 70 days; rest default to 300.",
         },
         "bookmaker_closing_common_subset": {
             "subset_n": len(joint_index),

@@ -5,6 +5,7 @@ on:
       - feature/daily-picks-engine-v2
     paths:
       - '.github/workflows/hf_winner_research_backtest.yml'
+      - 'tennis_rank_history.py'
       - 'tennis_hf_research_backtest.py'
   workflow_dispatch:
 
@@ -28,17 +29,17 @@ jobs:
         run: python -m unittest tests.test_hf_research_backtest -v
       - name: Real historical holdout and closing-market comparison
         env:
-          ORACLE_RESEARCH_OUTPUT: hf_winner_research_holdout.json
+          ORACLE_RESEARCH_OUTPUT: hf_winner_rank_history_posthoc.json
         run: |
           python tennis_hf_research_backtest.py > /tmp/research.log 2>&1 || {
             tail -n 150 /tmp/research.log
             exit 1
           }
-          cat hf_winner_research_holdout.json
+          cat hf_winner_rank_history_posthoc.json
       - name: Preserve aggregate research only
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hf-winner-holdout-vs-closing-research
-          path: hf_winner_research_holdout.json
+          name: hf-winner-posthoc-rank-research
+          path: hf_winner_rank_history_posthoc.json
           retention-days: 7
