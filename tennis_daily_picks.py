@@ -111,7 +111,7 @@ def _ticket(legs):
     }
 
 
-def _choose_combo(legs, sizes, low, target, banned_ids=()):
+def _choose_combo(legs, sizes, low, target, banned_ids=(), high=None):
     """No two markets from the same match; keep distinct ticket signatures."""
     best = None
     best_rank = None
@@ -124,7 +124,7 @@ def _choose_combo(legs, sizes, low, target, banned_ids=()):
                 continue
             t = _ticket(choice)
             combined = t["combined_odds"]
-            if combined < low:
+            if combined < low or (high is not None and combined > high):
                 continue
             # Robust choices first, then proximity to target, fewer legs as tie breaker.
             base = sum(x["ranking_score"] for x in choice) / n
@@ -257,9 +257,7 @@ def build_daily_products(matches, prices, predict, resolve, player_stats, surfac
         return report
 
     report["products"]["single"] = _ticket([shortlist[0]])
-    triple = _choose_combo(shortlist, (3,), 2.75, 3.0)
-    if triple and triple["combined_odds"] > 3.45:
-        triple = None
+    triple = _choose_combo(shortlist, (3,), 2.75, 3.0, high=3.45)
     report["products"]["three_by_three"] = triple or _missing("Nessuna terna attendibile vicino a quota 3.")
     multi = _choose_combo(shortlist, (3,4,5), 5.0, 5.5)
     report["products"]["multiple_5"] = multi or _missing("Non ci sono combinazioni idonee a quota 5+.")
