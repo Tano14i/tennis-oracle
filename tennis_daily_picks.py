@@ -43,7 +43,8 @@ def names_match(a, b):
         return False
     if len(aa) == 1 or len(bb) == 1:
         return True
-    return aa[0][0] == bb[0][0]
+    first_a, first_b = aa[0], bb[0]
+    return first_a == first_b or ((len(first_a) == 1 or len(first_b) == 1) and first_a[0] == first_b[0])
 
 
 def strict_player_id(name, name_lookup):
