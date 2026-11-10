@@ -152,7 +152,8 @@ def analyze():
     try:
         return _analyze_inner()
     except Exception as e:
-        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+        app.logger.exception("Analyze failed")
+        return jsonify({"error": "Analisi non disponibile; controlla i log del server."}), 500
 
 
 def _analyze_inner():

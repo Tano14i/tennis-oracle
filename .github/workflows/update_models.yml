@@ -83,7 +83,7 @@ jobs:
             Dockerfile Procfile README.md requirements.txt \
             tennis_api.py tennis_dataset.py tennis_models.py \
             tennis_config.py tennis_analysis.py tennis_odds.py tennis_schedule.py \
-            tennis_temporal.py tennis_daily_picks.py tennis_daily_tracker.py \
+            tennis_temporal.py tennis_model_gate.py tennis_daily_picks.py tennis_daily_tracker.py \
             models/
 
           git commit -m "Deploy: model update $(date '+%Y-%m-%d')"

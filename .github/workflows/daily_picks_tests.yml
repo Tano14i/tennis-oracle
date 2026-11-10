@@ -20,7 +20,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install network-client dependency for offline parser tests
-        run: python -m pip install requests numpy pandas scikit-learn
+        run: python -m pip install requests numpy pandas scikit-learn joblib flask flask-cors
+      - name: Verify deployment files and Python syntax
+        run: python -m unittest tests.test_deployment_contract -v
       - name: Compile Python modules
         run: python -m py_compile tennis_source_audit.py tennis_backtest.py tennis_model_gate.py tennis_temporal.py tennis_daily_picks.py tennis_daily_tracker.py tennis_api.py tennis_models.py tennis_trainer.py tennis_odds.py tennis_schedule.py
       - name: Check browser JavaScript syntax
