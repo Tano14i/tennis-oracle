@@ -99,3 +99,39 @@ Priorita':
    nello storico Git PRIMA di un deployment.
 
 Suite automatica: 67 test passati dopo l'ultimo run di ricerca.
+
+
+## 5. Elo cronologico per superficie — benchmark post-hoc
+
+Implemented in tennis_elo.py and tennis_elo_research.py; no production integration.
+Pre-match probability uses exclusively dates BEFORE each match date.
+All fixtures on the same calendar day are scored before that day's Elo updates.
+Separate ATP/WTA and Hard/Clay/Grass states; fixed rating scale 400, K global 28,
+K surface 36, maximum blended surface weight 65%. No market odds as features.
+
+Historical sample: 2,197 common June 2–November 8, 2026 fixtures:
+
+| Predictor | Accuracy | Brier (lower better) | Log loss |
+|---|---:|---:|---:|
+| Random Forest previous research | 61.994% | 0.22637 | 0.64337 |
+| Elo raw | 62.767% | 0.22163 | 0.63258 |
+| Elo pretest calibrated | 62.995% | 0.22238 | 0.63410 |
+| Closing market consensus | 66.682% | 0.20695 | 0.59907 |
+
+Elo slightly outperformed Random Forest on this reused historical cohort but
+underperformed the market. Logistic calibration improved accuracy but worsened
+Brier and log loss against raw Elo. Neither accuracy nor closing comparison
+establishes achievable betting ROI or model value against bookmakers.
+
+CAUTION: This very same June-November 2026 holdout was inspected before
+developing Elo. It is consequently POST-HOC DIAGNOSTIC, NOT an independent
+prospective test of this model family. No parameter tuning on the inspected
+sample is justified. The next untouched period must begin after Nov 8, 2026.
+
+Result: https://github.com/Tano14i/tennis-oracle/actions/runs/42907317350
+Unit test CI: 78 passed:
+https://github.com/Tano14i/tennis-oracle/actions/runs/42907331514
+
+Deployment remains blocked: provenance and commercial reuse rights for the
+external data are not independently approved, live prematch odds are not
+validated, and no future independent record has been demonstrated.
