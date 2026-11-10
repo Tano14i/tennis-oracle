@@ -43,5 +43,27 @@ jobs:
                   vals=[x.get(field) for x in rows]
                   print(field,"NONEMPTY:",sum(bool(x) for x in vals), "TOP:", Counter(vals).most_common(7))
           assert all(f in reader.fieldnames for f in ("date","genre","joueur1_id","joueur2_id","vainqueur_id","cote1_ouverture","cote2_cloture")), "Expected field missing"
+          from datetime import datetime, timezone
+          now = datetime.now(timezone.utc)
+          future = []
+          bad_winners = []
+          for record in rows:
+              try:
+                  match_dt = datetime.strptime(record["date"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+              except (ValueError, TypeError, KeyError):
+                  continue
+              if record.get("vainqueur_id") not in (record.get("joueur1_id"), record.get("joueur2_id")):
+                  bad_winners.append(record)
+              if match_dt > now and record.get("score") and record.get("vainqueur_id"):
+                  future.append(record)
+          print("NOW_UTC", now.isoformat())
+          print("FUTURE_SETTLED_ROWS", len(future))
+          print("MISMATCHED_WINNER_IDS", len(bad_winners))
+          print("FUTURE_SETTLED_EXAMPLES", [
+              {k: row.get(k) for k in ("date","tournoi","joueur1","joueur2","score","vainqueur_id")}
+              for row in future[:5]
+          ])
+          assert not future, "Future-dated completed matches: rejecting unverified data source"
+          assert not bad_winners, "Mismatch between winner and listed players"
           print("SAMPLE:",[{key:r.get(key) for key in ("date","tournoi","joueur1","joueur2","vainqueur_id","score")} for r in rows[-2:]])
           PY
