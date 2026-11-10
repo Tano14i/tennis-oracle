@@ -267,7 +267,7 @@ def _analyze_inner():
         # BO5 labels are not calibrated; never offer these as BO5 bets.
         if best_of == 5:
             reliable = market == "winner"
-         labels   = market_labels.get(market, {"title": market, "yes": "Sì", "no": "No"})
+        labels   = market_labels.get(market, {"title": market, "yes": "Sì", "no": "No"})
 
         if prob >= 0.5:
             bet_label, bet_prob = labels["yes"], prob_pct
