@@ -1,0 +1,17 @@
+{
+  "settlement_schema": 1,
+  "source": "ESPN_SCOREBOARD_POST_WITH_WINNER_FLAG",
+  "source_match_id": "186540",
+  "tour": "ATP",
+  "fixture_date": "2026-11-11",
+  "matched_as_of_utc": "2026-11-11T18:40:06.405016+00:00",
+  "original_snapshot_utc": "2026-11-11T06:19:41.074483+00:00",
+  "model_id": "elo_g28_s36_w065_prior12_v1",
+  "no_real_wager": true,
+  "actual_winner": "Alejandro Tabilo",
+  "predicted_correct": true,
+  "picked_winner_probability": 0.582124,
+  "brier": 0.17462035137600002,
+  "quoted_paper_unit_net": null,
+  "quoted_decimal_odds": null
+}
