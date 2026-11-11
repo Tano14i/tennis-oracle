@@ -41,7 +41,7 @@ def _safe_player_id(value):
         raise ValueError("Player identifiers must be positive integer IDs")
 
 
-def pre_match_elo(frame):
+def pre_match_elo(frame, *, return_state=False):
     """Compute one independent pre-match Elo probability per historical match.
 
     Accepts winner/loser ordered outcomes but ALWAYS predicts the
@@ -122,7 +122,17 @@ def pre_match_elo(frame):
             surface_count[sb] += 1
 
     # Preserve original order, and use values from prior-day only.
-    return pd.DataFrame.from_dict(out, orient="index").reindex(df.index)
+    result = pd.DataFrame.from_dict(out, orient="index").reindex(df.index)
+    if not return_state:
+        return result
+    state = {
+        "global_rating": dict(global_rating),
+        "surface_rating": dict(surface_rating),
+        "global_count": dict(global_count),
+        "surface_count": dict(surface_count),
+        "last_historical_date": str(df["tourney_date"].max().date()),
+    }
+    return result, state
 
 
 def elo_configuration():
@@ -135,4 +145,40 @@ def elo_configuration():
         "surface_prior_matches": SURFACE_PRIOR_MATCHES,
         "same_day_results_used_for_prematch": False,
         "parameters_tuned_on_2026_test": False,
+    }
+
+
+
+def predict_from_state(state, tour, surface, p1_id, p2_id):
+    """Read-only forecast for a future, never-seen match using frozen Elo state.
+
+    The caller MUST build state from dated results strictly earlier than
+    the live match date. This function never updates Elo state.
+    """
+    if surface not in SURFACES or tour not in {"ATP", "WTA"}:
+        raise ValueError("Surface and ATP/WTA tour must be verified")
+    p1, p2 = _safe_player_id(p1_id), _safe_player_id(p2_id)
+    if p1 == p2:
+        raise ValueError("Cannot compare the same player")
+    a, b = (tour, p1), (tour, p2)
+    sa, sb = (tour, surface, p1), (tour, surface, p2)
+    r = state["global_rating"]
+    sr = state["surface_rating"]
+    gc = state["global_count"]
+    sc = state["surface_count"]
+    gp = win_probability(r.get(a, START), r.get(b, START))
+    sp = win_probability(sr.get(sa, START), sr.get(sb, START))
+    prior_surface = min(sc.get(sa, 0), sc.get(sb, 0))
+    weight = SURFACE_WEIGHT_MAX * prior_surface / (
+        prior_surface + SURFACE_PRIOR_MATCHES
+    )
+    return {
+        "p1_probability": (1-weight)*gp + weight*sp,
+        "global_p1_probability": gp,
+        "surface_p1_probability": sp,
+        "surface_weight": weight,
+        "p1_matches_before": gc.get(a, 0),
+        "p2_matches_before": gc.get(b, 0),
+        "p1_surface_matches_before": sc.get(sa, 0),
+        "p2_surface_matches_before": sc.get(sb, 0),
     }
