@@ -125,11 +125,25 @@ Massimo 350 parole. Tono vivace."""
 
 @app.route("/health")
 def health():
+    import json as _json
+    from tennis_model_gate import daily_model_gate
+    try:
+        with open(os.path.join(MODELS_DIR, "model_manifest.json"),
+                  encoding="utf-8") as stream:
+            manifest = _json.load(stream)
+    except (OSError, ValueError):
+        manifest = None
+    gate_ok, gate_reason = daily_model_gate(manifest)
     return jsonify({
-        "status": "ok",
+        "status": "ok" if MODELS_READY else "degraded",
         "models_ready": MODELS_READY,
         "players": len(player_stats) if MODELS_READY else 0,
-        "narrative_enabled": bool(os.environ.get("GEMINI_API_KEY"))
+        "narrative_enabled": bool(os.environ.get("GEMINI_API_KEY")),
+        "daily_picks_ready": MODELS_READY and gate_ok and bool(os.environ.get("ODDS_API_KEY")),
+        "daily_picks_note": (gate_reason if not gate_ok else
+                             "Quote API non configurata." if not os.environ.get("ODDS_API_KEY")
+                             else "Modelli storici freschi e credenziali quote disponibili."),
+        "training_data_latest_date": (manifest or {}).get("training_data_latest_date"),
     })
 
 
@@ -138,7 +152,8 @@ def analyze():
     try:
         return _analyze_inner()
     except Exception as e:
-        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+        app.logger.exception("Analyze failed")
+        return jsonify({"error": "Analisi non disponibile; controlla i log del server."}), 500
 
 
 def _analyze_inner():
@@ -263,11 +278,10 @@ def _analyze_inner():
         # In BO5 (Grand Slam): mostra sets_over invece di games_over (soglie diverse)
         # games_over soglia 22.5 non ha senso in BO5 — nascosto nel frontend
         reliable = market in RELIABLE_MARKETS
-        if best_of == 5 and market == "sets_over":
-            reliable = True   # "Over 3.5 set" è valido e utile in Grand Slam
-            # Promuovi a "media" se abbastanza lontano da 50% (>55%)
-            if conf == "bassa" and abs(prob - 0.5) >= 0.08:
-                conf = "media"
+        # Training labels are BO3-only for games 22.5 and the set/ace
+        # BO5 labels are not calibrated; never offer these as BO5 bets.
+        if best_of == 5:
+            reliable = market == "winner"
         labels   = market_labels.get(market, {"title": market, "yes": "Sì", "no": "No"})
 
         if prob >= 0.5:
@@ -362,6 +376,79 @@ def _get_value_bets(p1_name, p2_name, markets):
         return find_value_bets(markets, odds, p1_name, p2_name)
     except Exception:
         return {}
+
+
+
+# ---------------------------------------------------------------------------
+# Tennis Oracle 2.0 — research only; never fabricate unavailable picks.
+# ---------------------------------------------------------------------------
+@app.route("/daily_picks", methods=["GET"])
+def daily_picks():
+    from datetime import datetime, timezone
+    from tennis_daily_picks import build_daily_products, empty_report, strict_player_id
+    from tennis_schedule import get_matches_today
+
+    now = datetime.now(timezone.utc)
+    if not MODELS_READY:
+        return jsonify(empty_report(now, "Modelli non caricati: nessuna selezione.")), 503
+    from tennis_model_gate import daily_model_gate
+    import json as _json
+    try:
+        with open(os.path.join(MODELS_DIR, "model_manifest.json"),
+                  encoding="utf-8") as stream:
+            manifest = _json.load(stream)
+    except (OSError, ValueError):
+        manifest = None
+    gate_ok, reason = daily_model_gate(manifest, now)
+    if not gate_ok:
+        return jsonify(empty_report(now, reason))
+    if not os.environ.get("ODDS_API_KEY"):
+        return jsonify(empty_report(now, "ODDS_API_KEY assente: nessuna quota verificabile."))
+    odds = _get_cached_odds()
+    if not odds:
+        return jsonify(empty_report(now, "Nessuna quota tennis disponibile dal provider."))
+
+    try:
+        matches = get_matches_today()
+    except Exception as exc:
+        print(f"Daily schedule fetch error: {exc}")
+        return jsonify(empty_report(now, "Palinsesto non raggiungibile."))
+    if not matches:
+        return jsonify(empty_report(now, "Nessuna partita verificata nel palinsesto odierno."))
+
+    def _predict(a, b, surface, level, rnd, best_of):
+        result, _, _ = predict_match(
+            a, b, surface, level, rnd, best_of,
+            player_stats, surface_stats, df_history
+        )
+        return result
+
+    report = build_daily_products(
+        matches, odds, _predict,
+        lambda player: strict_player_id(player, name_lookup),
+        player_stats, surface_stats, now=now
+    )
+    db_path = os.environ.get("ORACLE_DB_PATH", "")
+    report["tracking"] = {"enabled": bool(db_path), "new_snapshots": 0}
+    if db_path:
+        try:
+            from tennis_daily_tracker import record_report
+            report["tracking"]["new_snapshots"] = record_report(db_path, report)
+        except Exception as exc:
+            print(f"Daily tracking error: {exc}")
+            report["tracking"]["error"] = "Storico non disponibile."
+    return jsonify(report)
+
+
+@app.route("/daily_picks/history", methods=["GET"])
+def daily_picks_history():
+    from tennis_daily_tracker import read_history
+    db_path = os.environ.get("ORACLE_DB_PATH", "")
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (ValueError, TypeError):
+        limit = 50
+    return jsonify(read_history(db_path, limit))
 
 
 @app.route("/odds_status")

@@ -1,90 +1,84 @@
-"""
-tennis_trainer.py
-Training autonomo dei modelli ML per Tennis Oracle.
+"""Point-in-time retraining for Tennis Oracle 2.0.
 
-    python tennis_trainer.py
+Earlier dates fit the Random Forest. Later, disjoint dates calibrate it.
+Calibration diagnostics are not independent out-of-sample performance.
+Use tennis_backtest.py for untouched test evaluations.
 """
-
+import json
 import os
-import sys
-import time
-import numpy as np
+from datetime import datetime, timezone
+
+import joblib
 import pandas as pd
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, BASE_DIR)
-
-from tennis_dataset import (
-    download_dataset, enrich_dataframe,
-    build_player_stats_lookup, build_surface_stats, build_name_lookup,
-)
-from tennis_models import train_all_models, MODELS_DIR, RELIABLE_MARKETS
+from tennis_dataset import download_dataset, enrich_dataframe, build_name_lookup
+from tennis_models import MODELS_DIR
+from tennis_temporal import build_temporal_frame, chronological_masks, temporal_model_sets
 
 
 def run_training():
-    print("=" * 50)
-    print("TENNIS ORACLE — TRAINING")
-    print("=" * 50)
-
-    print("\n[1/4] Download dataset Sackmann (ATP + WTA + Challenger)...")
-    t0 = time.time()
-    df = download_dataset(include_challenger=True, include_futures=False)
-    print(f"      Partite scaricate: {len(df)} ({time.time()-t0:.1f}s)")
-
+    print("TENNIS ORACLE 2.0 — CHRONOLOGICAL TRAINING")
+    df = download_dataset(include_challenger=True, include_futures=False, strict=True)
     if len(df) < 1000:
-        print("ERRORE: dataset insufficiente.")
-        return
-
-    print("\n[2/4] Parsing score e calcolo target...")
+        raise RuntimeError("Insufficient historical data: training interrupted.")
+    # A monthly "success" must not publish models trained on stale archives.
+    newest = pd.Timestamp(df["tourney_date"].max()).date()
+    age = (datetime.now(timezone.utc).date() - newest).days
+    if age < 0 or (age > 21 and os.environ.get("ORACLE_ALLOW_STALE_RESEARCH") != "1"):
+        raise RuntimeError(
+            f"Latest research data {newest} is {age} days old: refusing live model update"
+        )
     df = enrich_dataframe(df)
     df = df[df["n_sets"] > 0].copy()
-    print(f"      Partite valide: {len(df)}")
+    pack = build_temporal_frame(df)
+    print("Valid rows:", len(pack["raw"]), "IDs with collision:", len(pack["colliding_ids"]))
 
-    bo3 = df[df["best_of"] == 3]
-    print(f"\n      Baseline mercati affidabili (BO3):")
-    print(f"        Both win set:    {bo3['target_both_set'].mean()*100:.1f}%")
-    print(f"        Games over 22.5: {bo3['target_games_over_225'].mean()*100:.1f}%")
-    print(f"        Aces over 10.5:  {df['target_aces_over_105'].mean()*100:.1f}%")
+    train, calibration, _, cal_start = chronological_masks(pack, "2100-01-01")
+    models, calibration_diagnostics = temporal_model_sets(pack, train, calibration)
+    if "winner" not in models or "games_over" not in models:
+        raise RuntimeError("Missing trained winner or games model; refusing partial publication")
 
-    print("\n[3/4] Calcolo statistiche rolling giocatori...")
-    t0 = time.time()
-    player_stats = build_player_stats_lookup(df)
-    surface_stats = build_surface_stats(df)
-    name_lookup = build_name_lookup(df)
-    print(f"      Giocatori nel lookup: {len(player_stats)} ({time.time()-t0:.1f}s)")
-
-    print("\n[4/4] Training modelli...")
-    results = train_all_models(df, player_stats, surface_stats)
-
-    # Salva lookup su disco
-    import joblib
     os.makedirs(MODELS_DIR, exist_ok=True)
-    joblib.dump(player_stats,  os.path.join(MODELS_DIR, "player_stats.pkl"))
-    joblib.dump(surface_stats, os.path.join(MODELS_DIR, "surface_stats.pkl"))
-    joblib.dump(name_lookup,   os.path.join(MODELS_DIR, "name_lookup.pkl"))
-    joblib.dump(df[["winner_id", "loser_id", "tourney_date", "surface",
-                    "tourney_level", "best_of", "round", "score",
-                    "n_sets", "total_games", "tiebreaks",
-                    "winner_rank", "loser_rank"]].copy(),
+    for market, model in models.items():
+        joblib.dump(model, os.path.join(MODELS_DIR, f"model_{market}.pkl"))
+
+    # Ambiguous cross-tour numeric IDs are excluded, not silently mixed.
+    raw_names = build_name_lookup(pack["raw"])
+    filtered_names = {name: pid for name, pid in raw_names.items()
+                      if pid in pack["player_stats"]}
+    joblib.dump(pack["player_stats"], os.path.join(MODELS_DIR, "player_stats.pkl"))
+    joblib.dump(pack["surface_stats"], os.path.join(MODELS_DIR, "surface_stats.pkl"))
+    joblib.dump(filtered_names, os.path.join(MODELS_DIR, "name_lookup.pkl"))
+    historical_cols = [
+        "winner_id", "loser_id", "tourney_date", "surface", "tourney_level",
+        "best_of", "round", "score", "n_sets", "total_games", "tiebreaks",
+        "winner_rank", "loser_rank"
+    ]
+    joblib.dump(pack["raw"][historical_cols].copy(),
                 os.path.join(MODELS_DIR, "df_history.pkl"))
-    print("\n      Tutti i file salvati in models/")
 
-    print("\n" + "=" * 50)
-    print("RISULTATI TRAINING")
-    print("=" * 50)
-    for market, res in results.items():
-        acc = res["accuracy"]
-        pos = res["positive_rate"]
-        baseline = 0.643 if market == "winner" else max(pos, 1 - pos)
-        lift = acc - baseline
-        status = "OK" if market in RELIABLE_MARKETS and lift > 0 else "!!"
-        label = "(affidabile)" if market in RELIABLE_MARKETS else "(nascosto nel report)"
-        print(f"  {status} {market:<15} Acc: {acc:.3f} | Baseline: {baseline:.3f} | Lift: {lift:+.3f} {label}")
-
-    print("\nTraining completato.")
-    print("Avvia tennis_bot.py per il bot Telegram.")
-    print("\nMercati mostrati nel report: winner, both_set, games_over, aces_over")
-    print("Mercati nascosti (sotto baseline): sets_over, tiebreak")
+    newest = pd.Timestamp(pack["dates"].max()).date().isoformat()
+    metadata = {
+        "feature_engine": "temporal-v2",
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "training_data_latest_date": newest,
+        "train_matches": int(train.sum()),
+        "calibration_matches": int(calibration.sum()),
+        "calibration_starts": cal_start,
+        "trained_markets": sorted(models),
+        "calibration_only": calibration_diagnostics,
+        "independent_backtest_completed": False,
+        "data_license": "CC BY-NC-SA 4.0, research/non-commercial only",
+        "source_note": "Aneeshers archival mirror; not a live data feed",
+    }
+    # Manifest is written LAST; failed earlier steps cannot claim success.
+    manifest_path = os.path.join(MODELS_DIR, "model_manifest.json")
+    with open(manifest_path + ".tmp", "w", encoding="utf-8") as output:
+        json.dump(metadata, output, indent=2, ensure_ascii=False)
+    os.replace(manifest_path + ".tmp", manifest_path)
+    print(json.dumps(metadata, ensure_ascii=False, indent=2))
+    print("Training complete. Calibration diagnostics are NOT held-out test results.")
+    return metadata
 
 
 if __name__ == "__main__":

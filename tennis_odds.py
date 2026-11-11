@@ -67,71 +67,70 @@ def _normalize_name(name):
 
 
 def _name_match(player_name, team_name):
-    """True se il cognome del giocatore è nel nome del team (o viceversa)."""
-    pn = _normalize_name(player_name)
-    tn = _normalize_name(team_name)
-    return pn in tn or tn in pn or pn[:4] == tn[:4]
+    """Reject fuzzy substring matches that can misidentify a player."""
+    from tennis_daily_picks import names_match
+    return names_match(player_name, team_name)
 
 
 def parse_match_odds(odds_data):
-    """
-    Estrae le migliori quote h2h e totals per ogni match.
-    Ritorna lista di dict con odds dettagliate.
+    """Parse coherent quotes: sides and lines must come from the SAME bookmaker.
+
+    This is a market snapshot, NOT a confirmed executable bet.
+    Prefer the 22.5 totals line because the existing model predicts 22.5 only.
     """
     matches = []
     for match in odds_data:
-        home = match.get("home_team", "")
-        away = match.get("away_team", "")
-        time = match.get("commence_time", "")
-        sport = match.get("sport_key", "")
-
+        home, away = match.get("home_team", ""), match.get("away_team", "")
+        if not home or not away:
+            continue
         best = {
             "home_h2h": 0.0, "away_h2h": 0.0, "book_h2h": "",
             "over_total": 0.0, "under_total": 0.0,
             "total_point": None, "book_totals": "",
         }
-
-        books_sorted = sorted(
-            match.get("bookmakers", []),
-            key=lambda b: PREFERRED_BOOKS.index(b["key"]) if b["key"] in PREFERRED_BOOKS else 999
-        )
-
-        for bm in books_sorted:
-            for mkt in bm.get("markets", []):
-                outcomes = mkt.get("outcomes", [])
-
-                if mkt["key"] == "h2h":
-                    od = {o["name"]: o["price"] for o in outcomes}
-                    h = od.get(home, 0)
-                    a = od.get(away, 0)
-                    if h > 1.0 and a > 1.0 and (best["book_h2h"] == "" or
-                       bm["key"] in PREFERRED_BOOKS[:3]):
-                        best["home_h2h"]  = round(h, 3)
-                        best["away_h2h"]  = round(a, 3)
-                        best["book_h2h"]  = bm["key"]
-
-                elif mkt["key"] == "totals" and best["book_totals"] == "":
-                    for o in outcomes:
-                        pt = o.get("point")
-                        if o["name"] == "Over" and o["price"] > 1.0:
-                            best["over_total"]  = round(o["price"], 3)
-                            best["total_point"] = pt
-                        elif o["name"] == "Under" and o["price"] > 1.0:
-                            best["under_total"] = round(o["price"], 3)
-                    if best["over_total"] > 0:
-                        best["book_totals"] = bm["key"]
-
-        if best["home_h2h"] > 1.0:
+        books = sorted(match.get("bookmakers") or [],
+                       key=lambda b: PREFERRED_BOOKS.index(b.get("key"))
+                       if b.get("key") in PREFERRED_BOOKS else 999)
+        for book in books:
+            for market in book.get("markets") or []:
+                outcomes = market.get("outcomes") or []
+                if market.get("key") == "h2h" and not best["book_h2h"]:
+                    mapped = {o.get("name"): o.get("price") for o in outcomes}
+                    try:
+                        h, a = float(mapped[home]), float(mapped[away])
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    if h > 1 and a > 1:
+                        best.update(home_h2h=round(h, 3),
+                                    away_h2h=round(a, 3),
+                                    book_h2h=book.get("key", ""))
+                elif market.get("key") == "totals":
+                    # Pair Over/Under by their actual point; never combine
+                    # different point lines or bookmakers.
+                    lines = {}
+                    for outcome in outcomes:
+                        try:
+                            line = float(outcome["point"])
+                            price = float(outcome["price"])
+                        except (KeyError, TypeError, ValueError):
+                            continue
+                        if price > 1 and outcome.get("name") in ("Over", "Under"):
+                            lines.setdefault(line, {})[outcome["name"]] = price
+                    if not best["book_totals"] and lines.get(22.5, {}).keys() >= {"Over", "Under"}:
+                        point = lines[22.5]
+                        best.update(over_total=round(point["Over"], 3),
+                                    under_total=round(point["Under"], 3),
+                                    total_point=22.5,
+                                    book_totals=book.get("key", ""))
+        if best["home_h2h"] > 1 or best["over_total"] > 1:
             matches.append({
-                "home_team":     home,
-                "away_team":     away,
-                "commence_time": time,
-                "sport_key":     sport,
-                **best,
+                "home_team": home, "away_team": away,
+                "commence_time": match.get("commence_time", ""),
+                "sport_key": match.get("sport_key", ""),
+                "event_id": match.get("id", ""),
+                **best
             })
-
     return matches
-
 
 # ---------------------------------------------------------------------------
 # Value bet calculation
@@ -198,7 +197,7 @@ def find_value_bets(ml_predictions, odds_matches, p1_name, p2_name):
         ("p2", 1 - ml_prob_p1,   match_odds["away_h2h"], f"{p2_name} vince"),
     ]:
         vb = compute_value_bet(ml_prob, odds_val)
-        if vb["has_value"]:
+        if winner_pred.get("reliable", True) and vb["has_value"]:
             value_bets[f"winner_{direction}"] = {
                 **vb,
                 "market":    "Winner",
@@ -208,7 +207,9 @@ def find_value_bets(ml_predictions, odds_matches, p1_name, p2_name):
             }
 
     # --- Totals (games over/under) ---
-    if match_odds.get("total_point") and match_odds.get("over_total", 0) > 1.0:
+    if (match_odds.get("total_point") == 22.5 and
+        match_odds.get("over_total", 0) > 1.0 and
+        games_pred.get("reliable", True)):
         point = match_odds["total_point"]
         for direction, ml_prob, odds_val, label in [
             ("over",  ml_prob_over,       match_odds["over_total"],  f"Over {point}"),
