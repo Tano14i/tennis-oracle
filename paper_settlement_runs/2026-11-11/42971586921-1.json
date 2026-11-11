@@ -1,0 +1,17 @@
+{
+  "run_at_utc": "2026-11-11T06:19:49.140568+00:00",
+  "source": "ESPN",
+  "pending_examined": 0,
+  "settled_this_run": 0,
+  "still_pending": 0,
+  "api_errors_by_tour_day": {},
+  "first_snapshots_total": 11,
+  "settled_total": 0,
+  "winner_accuracy": null,
+  "brier_mean": null,
+  "priced_settled_count": 0,
+  "quoted_paper_roi_pct": null,
+  "roi_method": "Hypothetical flat 1-unit bets using captured prematch odds only; not actual betting",
+  "not_financial_advice": true,
+  "no_real_wager": true
+}
