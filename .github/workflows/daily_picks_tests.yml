@@ -24,7 +24,7 @@ jobs:
       - name: Verify deployment files and Python syntax
         run: python -m unittest tests.test_deployment_contract -v
       - name: Compile Python modules
-        run: python -m py_compile tennis_elo_research.py tennis_elo.py tennis_rank_history.py tennis_hf_research_backtest.py tennis_hf_crosswalk.py tennis_hf_audit.py tennis_source_audit.py tennis_backtest.py tennis_model_gate.py tennis_temporal.py tennis_daily_picks.py tennis_daily_tracker.py tennis_api.py tennis_models.py tennis_trainer.py tennis_odds.py tennis_schedule.py
+        run: python -m py_compile tennis_paper_trial.py tennis_paper_ledger.py tennis_paper_settlement.py tennis_elo_research.py tennis_elo.py tennis_rank_history.py tennis_hf_research_backtest.py tennis_hf_crosswalk.py tennis_hf_audit.py tennis_source_audit.py tennis_backtest.py tennis_model_gate.py tennis_temporal.py tennis_daily_picks.py tennis_daily_tracker.py tennis_api.py tennis_models.py tennis_trainer.py tennis_odds.py tennis_schedule.py
       - name: Check browser JavaScript syntax
         run: |
           python - <<'PY'
