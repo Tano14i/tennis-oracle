@@ -59,8 +59,7 @@ class LedgerTests(unittest.TestCase):
             persist(snapshot({**pred(),"wager_submitted":True}),tmp,"run-1")
             path=Path(tmp)/"paper_attempts"/"2026-11-11"/"run-1.json"
             self.assertTrue(path.exists())
-            self.assertFalse(list((Path(tmp)/"paper_predictions").glob("**/*.json"))
-                             if (Path(tmp)/"paper_predictions").exists() else True)
+            self.assertFalse(list((Path(tmp)/"paper_predictions").glob("**/*.json")))
             with self.assertRaises(ValueError):
                 persist(snapshot(pred()),tmp,"run-1")
 
