@@ -1,0 +1,17 @@
+{
+  "settlement_schema": 1,
+  "source": "ESPN_SCOREBOARD_POST_WITH_WINNER_FLAG",
+  "source_match_id": "186551",
+  "tour": "ATP",
+  "fixture_date": "2026-11-12",
+  "matched_as_of_utc": "2026-11-12T22:43:18.322199+00:00",
+  "original_snapshot_utc": "2026-11-12T13:44:12.509377+00:00",
+  "model_id": "elo_g28_s36_w065_prior12_v1",
+  "no_real_wager": true,
+  "actual_winner": "Taylor Fritz",
+  "predicted_correct": true,
+  "picked_winner_probability": 0.64477,
+  "brier": 0.12618835290000002,
+  "quoted_paper_unit_net": null,
+  "quoted_decimal_odds": null
+}
