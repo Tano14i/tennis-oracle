@@ -1,0 +1,17 @@
+{
+  "settlement_schema": 1,
+  "source": "ESPN_SCOREBOARD_POST_WITH_WINNER_FLAG",
+  "source_match_id": "187376",
+  "tour": "WTA",
+  "fixture_date": "2026-11-12",
+  "matched_as_of_utc": "2026-11-13T13:04:05.184106+00:00",
+  "original_snapshot_utc": "2026-11-12T13:44:12.509377+00:00",
+  "model_id": "elo_g28_s36_w065_prior12_v1",
+  "no_real_wager": true,
+  "actual_winner": "Jessica Pegula",
+  "predicted_correct": true,
+  "picked_winner_probability": 0.613663,
+  "brier": 0.14925627756900003,
+  "quoted_paper_unit_net": null,
+  "quoted_decimal_odds": null
+}
