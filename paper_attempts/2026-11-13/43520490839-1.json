@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "mode": "PROSPECTIVE_RESEARCH_PAPER_ONLY",
+  "captured_at_utc": "2026-11-13T22:35:33.204494+00:00",
+  "model_id": "elo_g28_s36_w065_prior12_v1",
+  "model_git_revision": "41faffbec5b5a9a703adbb051feb75a544c57e42",
+  "source_history_strictly_before_date": "2026-11-13",
+  "ratings_last_historical_date": "2026-11-08",
+  "source_identity_mapping_count": 826,
+  "fixture_source": "ESPN scoreboard, date-local UTC only",
+  "surface_quality": "Tournament-name heuristic, not independently verified",
+  "quote_mode": "OPTIONAL_EXPLICIT_EXISTING_KEY_ONLY",
+  "odds_missing_is_not_a_value_bet": true,
+  "no_wager_execution": true,
+  "events_seen": 6,
+  "predictions_count": 0,
+  "priced_predictions": 0,
+  "skipped": {
+    "not_scheduled": 6
+  },
+  "predictions": [],
+  "verified_data_freshest_result_utc": "2026-11-08T22:05:00+00:00",
+  "research_data_records": 9341,
+  "source_sha256": {
+    "atp_matches_2025.csv": "958cd93216075165895b5764d63499193a91993bb30dc00822f262713f7b31e1",
+    "wta_matches_2025.csv": "76df7f0b9c8510f0b71e9bf2cf89e8051c3da2bf61c8d7289ee1c09909367e4a",
+    "atp_matches_2026.csv": "350a90b70f15add6c279f3d7893f00a6746660367ce5dfebdce553711940e9df",
+    "wta_matches_2026.csv": "ddbe50bcdf6750e09bbcdadef40bd6338142fef621b06ef866c7ad5e6bb2079e"
+  },
+  "historical_identity_qc": {
+    "verified_player_count": 826,
+    "independent_match_overlaps": 7366
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "settlement_schema": 1,
+  "source": "ESPN_SCOREBOARD_POST_WITH_WINNER_FLAG",
+  "source_match_id": "186773",
+  "tour": "WTA",
+  "fixture_date": "2026-11-13",
+  "matched_as_of_utc": "2026-11-13T22:35:38.514894+00:00",
+  "original_snapshot_utc": "2026-11-13T13:03:58.463583+00:00",
+  "model_id": "elo_g28_s36_w065_prior12_v1",
+  "no_real_wager": true,
+  "actual_winner": "Elizabeth Mandlik",
+  "predicted_correct": false,
+  "picked_winner_probability": 0.566871,
+  "brier": 0.321342730641,
+  "quoted_paper_unit_net": null,
+  "quoted_decimal_odds": null
+}
