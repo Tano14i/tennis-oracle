@@ -1,0 +1,17 @@
+{
+  "settlement_schema": 1,
+  "source": "ESPN_SCOREBOARD_POST_WITH_WINNER_FLAG",
+  "source_match_id": "187384",
+  "tour": "WTA",
+  "fixture_date": "2026-11-13",
+  "matched_as_of_utc": "2026-11-14T12:08:48.785811+00:00",
+  "original_snapshot_utc": "2026-11-13T13:03:58.463583+00:00",
+  "model_id": "elo_g28_s36_w065_prior12_v1",
+  "no_real_wager": true,
+  "actual_winner": "Mirra Andreeva",
+  "predicted_correct": false,
+  "picked_winner_probability": 0.522777,
+  "brier": 0.27329579172900004,
+  "quoted_paper_unit_net": null,
+  "quoted_decimal_odds": null
+}

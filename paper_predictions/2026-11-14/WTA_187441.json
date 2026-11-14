@@ -1,0 +1,40 @@
+{
+  "mode": "PROSPECTIVE_PAPER_ONLY",
+  "ledger_schema": 1,
+  "first_capture_run": "43593317313-1",
+  "source_model_version": "elo_g28_s36_w065_prior12_v1",
+  "model_git_revision": "41faffbec5b5a9a703adbb051feb75a544c57e42",
+  "prediction": {
+    "fixture_id": "187441",
+    "tour": "WTA",
+    "surface": "Hard",
+    "surface_source": "ESPN_tournament_heuristic",
+    "tournament": "FAGE WTA Finals Indian Wells",
+    "p1": "Mirra Andreeva",
+    "p2": "Jessica Pegula",
+    "p1_historical_id": 259799,
+    "p2_historical_id": 202468,
+    "scheduled_start_utc": "2026-11-14T20:00:00+00:00",
+    "captured_at_utc": "2026-11-14T12:08:43.600155+00:00",
+    "history_last_date": "2026-11-08",
+    "model_id": "elo_g28_s36_w065_prior12_v1",
+    "p1_probability": 0.404722,
+    "picked_winner_name": "Jessica Pegula",
+    "picked_winner_probability": 0.595278,
+    "p1_prior_matches": 117,
+    "p2_prior_matches": 133,
+    "quality_flags": {
+      "surface_not_independently_verified": true,
+      "cold_start": false,
+      "market_quote_unavailable": true
+    },
+    "odds_decimal": null,
+    "market_status": "missing_eligible_h2h_quote",
+    "bookmaker": null,
+    "provider_last_update_utc": null,
+    "paper_only": true,
+    "wager_submitted": false
+  },
+  "settlement_status": "pending",
+  "no_real_wager": true
+}
