@@ -1,0 +1,17 @@
+{
+  "settlement_schema": 1,
+  "source": "ESPN_SCOREBOARD_POST_WITH_WINNER_FLAG",
+  "source_match_id": "187506",
+  "tour": "ATP",
+  "fixture_date": "2026-11-15",
+  "matched_as_of_utc": "2026-11-16T13:35:53.528013+00:00",
+  "original_snapshot_utc": "2026-11-15T12:42:09.925092+00:00",
+  "model_id": "elo_g28_s36_w065_prior12_v1",
+  "no_real_wager": true,
+  "actual_winner": "Ben Shelton",
+  "predicted_correct": true,
+  "picked_winner_probability": 0.533072,
+  "brier": 0.21802175718400002,
+  "quoted_paper_unit_net": null,
+  "quoted_decimal_odds": null
+}
