@@ -1,0 +1,17 @@
+{
+  "settlement_schema": 1,
+  "source": "ESPN_SCOREBOARD_POST_WITH_WINNER_FLAG",
+  "source_match_id": "186785",
+  "tour": "WTA",
+  "fixture_date": "2026-11-17",
+  "matched_as_of_utc": "2026-11-17T23:50:23.036631+00:00",
+  "original_snapshot_utc": "2026-11-17T00:47:14.813904+00:00",
+  "model_id": "elo_g28_s36_w065_prior12_v1",
+  "no_real_wager": true,
+  "actual_winner": "Lucia Bronzetti",
+  "predicted_correct": false,
+  "picked_winner_probability": 0.611955,
+  "brier": 0.37448892202500006,
+  "quoted_paper_unit_net": null,
+  "quoted_decimal_odds": null
+}
