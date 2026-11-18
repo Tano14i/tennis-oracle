@@ -1,0 +1,40 @@
+{
+  "mode": "PROSPECTIVE_PAPER_ONLY",
+  "ledger_schema": 1,
+  "first_capture_run": "44318528866-1",
+  "source_model_version": "elo_g28_s36_w065_prior12_v1",
+  "model_git_revision": "41faffbec5b5a9a703adbb051feb75a544c57e42",
+  "prediction": {
+    "fixture_id": "187514",
+    "tour": "ATP",
+    "surface": "Hard",
+    "surface_source": "ESPN_tournament_heuristic",
+    "tournament": "Nitto ATP Finals",
+    "p1": "Frances Tiafoe",
+    "p2": "Flavio Cobolli",
+    "p1_historical_id": 126207,
+    "p2_historical_id": 207925,
+    "scheduled_start_utc": "2026-11-18T19:30:00+00:00",
+    "captured_at_utc": "2026-11-18T13:54:57.748609+00:00",
+    "history_last_date": "2026-11-15",
+    "model_id": "elo_g28_s36_w065_prior12_v1",
+    "p1_probability": 0.620885,
+    "picked_winner_name": "Frances Tiafoe",
+    "picked_winner_probability": 0.620885,
+    "p1_prior_matches": 106,
+    "p2_prior_matches": 115,
+    "quality_flags": {
+      "surface_not_independently_verified": true,
+      "cold_start": false,
+      "market_quote_unavailable": true
+    },
+    "odds_decimal": null,
+    "market_status": "missing_eligible_h2h_quote",
+    "bookmaker": null,
+    "provider_last_update_utc": null,
+    "paper_only": true,
+    "wager_submitted": false
+  },
+  "settlement_status": "pending",
+  "no_real_wager": true
+}
