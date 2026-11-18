@@ -1,0 +1,17 @@
+{
+  "settlement_schema": 1,
+  "source": "ESPN_SCOREBOARD_POST_WITH_WINNER_FLAG",
+  "source_match_id": "186807",
+  "tour": "WTA",
+  "fixture_date": "2026-11-18",
+  "matched_as_of_utc": "2026-11-18T23:23:19.088824+00:00",
+  "original_snapshot_utc": "2026-11-18T13:54:57.748609+00:00",
+  "model_id": "elo_g28_s36_w065_prior12_v1",
+  "no_real_wager": true,
+  "actual_winner": "Leyre Romero Gormaz",
+  "predicted_correct": false,
+  "picked_winner_probability": 0.565211,
+  "brier": 0.31946347452100005,
+  "quoted_paper_unit_net": null,
+  "quoted_decimal_odds": null
+}
