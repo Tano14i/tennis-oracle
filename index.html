@@ -157,6 +157,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 <div id="pager" class="pager"></div>
 
+
+<!-- Tennis Oracle 2.0: 4 transparent research categories -->
+<section id="dailyPicksSection" style="padding:16px;border-bottom:1px solid #e8e8e8">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+    <strong style="font-size:17px">🎾 Oracle Daily Picks</strong>
+    <span style="font-size:10px;border:1px solid #c98b28;color:#8f6200;border-radius:8px;padding:4px 8px">SPERIMENTALE</span>
+  </div>
+  <div style="font-size:12px;color:#666;margin-bottom:10px">
+    Singola 1.40+ · 3×3 ~3.00 · Multipla 5+ · Bomba 7+. Quote reali quando disponibili,
+    senza garanzie di risultato.
+  </div>
+  <div id="dailyPicksCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">
+    <div style="color:#888;font-size:13px">In attesa delle quote…</div>
+  </div>
+  <div id="dailyPicksMeta" style="font-size:11px;color:#888;margin-top:8px"></div>
+</section>
+
 <!-- Value Bets Today -->
 <div id="valueBetsTodaySection" style="display:none;padding:12px 16px">
   <div style="font-size:11px;font-weight:600;color:#1b5e20;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">💰 Value Bets del giorno</div>
@@ -183,11 +200,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="stats-row" id="statsRow"></div>
     <div class="h2h-row" id="h2hRow"></div>
     <div class="markets-grid" id="marketsGrid"></div>
-    <div id="datasetNote" style="margin-top:10px;font-size:11px;color:#aaa;text-align:center">Analisi ML su match ATP/WTA ufficiali · Challenger/ITF non inclusi · narrativa Gemini AI</div>
+    <div id="datasetNote" style="margin-top:10px;font-size:11px;color:#888;text-align:center">
+      Fonte storica: Jeff Sackmann / Tennis Abstract (CC BY-NC-SA 4.0), mirror archivistico.
+      Informazioni non aggiornate in tempo reale; uso di ricerca non commerciale.
+    </div>
   </div>
 
   <!-- Validatore scommessa -->
-  <div class="step-box" id="betValidatorBox">
+  <div class="step-box" id="betValidatorBox" style="display:none">
     <div class="step-title">🎯 Valida la tua scommessa</div>
     <div class="manual-form">
       <div class="row2">
@@ -300,7 +320,10 @@ async function checkApi() {
       const d = await r.json();
       apiReady = true;
       el.className = "api-status api-ok";
-      el.textContent = "✓ ML attivo — " + d.players + " giocatori";
+      el.textContent = d.daily_picks_ready
+        ? "✓ ML disponibile · Daily Picks attive"
+        : "⚠ Dati ML storici · Daily Picks non disponibili";
+      if (!d.daily_picks_ready) el.className = "api-status api-warn";
     } else throw new Error("HTTP " + r.status);
   } catch(e) {
     apiReady = false;
@@ -356,6 +379,7 @@ async function loadSchedule() {
     const picker = document.getElementById("datePicker");
     const todayISO = picker.value || new Date().toISOString().slice(0,10);
     if (!picker.value) picker.value = todayISO;
+    loadDailyPicks();
     const d = todayISO.replace(/-/g,"");
     const dateObj = new Date(todayISO + "T12:00:00");
     document.getElementById("dateLabel").textContent = dateObj.toLocaleDateString("it-IT", {weekday:"long", day:"numeric", month:"long", year:"numeric"});
@@ -431,8 +455,7 @@ async function loadSchedule() {
     } else {
       applyFilters();
       loadChallengerSchedule();
-      computeTop5();
-      loadValueBetsToday();
+      // Legacy ranking disabled: it does not use verified market prices.
     }
   } catch(e) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div>Errore di connessione.<br><small>' + e.message + '</small></div>';
@@ -539,6 +562,63 @@ async function loadChallengerSchedule() {
       showToast(`+${added} partite Challenger/ITF`);
     }
   } catch(e) { /* Sofascore non raggiungibile */ }
+}
+
+
+// ---- Oracle Daily Picks: source-backed experimental research tickets ----
+function escapeOracleHTML(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, ch => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]
+  ));
+}
+async function loadDailyPicks() {
+  const cards = document.getElementById("dailyPicksCards");
+  const meta = document.getElementById("dailyPicksMeta");
+  if (!cards || !meta) return;
+  const selected = document.getElementById("datePicker")?.value;
+  const today = new Date().toISOString().slice(0,10);
+  if (selected && selected !== today) {
+    cards.textContent = "Le proposte con quote live sono disponibili solo per oggi (UTC).";
+    meta.textContent = "";
+    return;
+  }
+  cards.textContent = "Caricamento delle quote verificate…";
+  try {
+    const response = await fetch(API_URL + "/daily_picks", {signal: AbortSignal.timeout(30000)});
+    const data = await response.json();
+    const definitions = [
+      ["single","🎯 Singola 1.40+"],
+      ["three_by_three","🧩 3×3 ~3.00"],
+      ["multiple_5","📊 Multipla 5+"],
+      ["bomb_7","🔥 Bomba 7+"]
+    ];
+    cards.innerHTML = definitions.map(([key, title]) => {
+      const ticket = (data.products || {})[key] || {};
+      const available = ticket.status === "experimental";
+      const legs = (ticket.legs || []).map(leg =>
+        '<div style="padding:7px 0;border-top:1px solid #eee;font-size:12px">' +
+        '<div style="font-weight:600">' + escapeOracleHTML(leg.p1) + ' – ' + escapeOracleHTML(leg.p2) + '</div>' +
+        '<div>' + escapeOracleHTML(leg.selection) + ' · <strong>@' + escapeOracleHTML(Number(leg.odds).toFixed(2)) + '</strong></div>' +
+        '<div style="color:#777;font-size:11px">' + escapeOracleHTML(leg.bookmaker) +
+        ' · Modello ' + escapeOracleHTML((leg.model_probability*100).toFixed(0)) +
+        '% · Dati ' + escapeOracleHTML(leg.quality_score) + '/100</div></div>'
+      ).join("");
+      return '<div style="padding:12px;border:1px solid #ddd;border-radius:12px;background:#fff">' +
+        '<div style="font-weight:700;font-size:14px;margin-bottom:6px">' + title + '</div>' +
+        (available ?
+           '<div style="font-size:23px;font-weight:700;margin-bottom:4px">@' +
+           escapeOracleHTML(Number(ticket.combined_odds).toFixed(2)) + '</div>' + legs :
+           '<div style="font-size:12px;color:#777">' +
+           escapeOracleHTML(ticket.reason || "Nessuna selezione disponibile") + '</div>') +
+        '</div>';
+    }).join("");
+    meta.textContent = "Ricerca sperimentale · " + (data.candidate_count || 0) +
+      " selezioni candidate · " + (data.scanned_matches || 0) +
+      " match analizzati · Nessuna redditività dimostrata";
+  } catch (err) {
+    cards.textContent = "Impossibile verificare le quote: nessuna proposta.";
+    meta.textContent = String(err.message || "");
+  }
 }
 
 // ---- Value Bets Today (The Odds API) ----

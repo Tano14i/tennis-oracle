@@ -1,0 +1,40 @@
+name: Historical Full-Size Holdout Validation (subgroups)
+on:
+  push:
+    branches:
+      - feature/daily-picks-engine-v2
+    paths:
+      - '.github/workflows/temporal_full_validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-holdout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install model dependencies
+        run: python -m pip install pandas numpy scikit-learn requests joblib
+      - name: Chronological holdout - 250 trees
+        env:
+          ORACLE_BACKTEST_TREES: '250'
+          ORACLE_BACKTEST_JSON: 'backtest_results_v2_250trees.json'
+        run: |
+          python tennis_backtest.py > /tmp/oracle_full.log 2>&1 || {
+            tail -n 150 /tmp/oracle_full.log
+            exit 1
+          }
+          cat backtest_results_v2_250trees.json
+      - name: Upload report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tennis-chronological-backtest-v2-250trees-subgroups
+          path: backtest_results_v2_250trees.json
+          retention-days: 14

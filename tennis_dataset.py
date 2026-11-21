@@ -15,10 +15,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-ATP_URL        = "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_{year}.csv"
-WTA_URL        = "https://raw.githubusercontent.com/JeffSackmann/tennis_wta/master/wta_matches_{year}.csv"
-ATP_CHALL_URL  = "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_qual_chall_{year}.csv"
-ATP_FUTURES_URL= "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_futures_{year}.csv"
+# Original upstream GitHub repos were removed in 2026. Research-only CC BY-NC-SA
+# mirror; it is not an ongoing feed. User may override for a licensed source.
+ARCHIVE_BASE = os.environ.get(
+    "TENNIS_ARCHIVE_BASE",
+    "https://raw.githubusercontent.com/Aneeshers/tennis-sackmann-archive/main"
+).rstrip("/")
+ATP_URL         = ARCHIVE_BASE + "/atp/atp_matches_{year}.csv"
+WTA_URL         = ARCHIVE_BASE + "/wta/wta_matches_{year}.csv"
+ATP_CHALL_URL   = ARCHIVE_BASE + "/atp/atp_matches_qual_chall_{year}.csv"
+ATP_FUTURES_URL = ARCHIVE_BASE + "/atp/atp_matches_futures_{year}.csv"
 
 YEARS = list(range(2018, datetime.now().year + 1))
 
@@ -37,49 +43,69 @@ SOURCES = [
 # Download
 # ---------------------------------------------------------------------------
 
-def download_dataset(force=False, include_challenger=True, include_futures=False):
-    """Scarica ATP, WTA e opzionalmente Challenger/Futures da Sackmann GitHub."""
-    dfs = []
+def download_dataset(force=False, include_challenger=True, include_futures=False,
+                     strict=False):
+    """Load cached CSVs and optionally refresh from a licensed research archive.
+
+    strict=True fails on any missing/undownloadable requested CSV. This avoids
+    declaring a partially refreshed dataset 'successful' during training.
+    The mirror is archival and can be months behind current events.
+    """
+    dfs, missing = [], []
     for year in YEARS:
         for prefix, url_template, tour_label, use_for_training in SOURCES:
             if not include_challenger and tour_label == "Challenger":
                 continue
             if not include_futures and tour_label == "ITF":
                 continue
-
             fname = os.path.join(DATA_DIR, f"{prefix}_{year}.csv")
             if not os.path.exists(fname) or force:
                 url = url_template.format(year=year)
                 try:
-                    r = requests.get(url, timeout=30)
-                    if r.status_code == 200 and len(r.content) > 500:
-                        with open(fname, "w", encoding="utf-8") as f:
-                            f.write(r.text)
-                        print(f"Scaricato: {tour_label} {year}")
-                    else:
+                    response = requests.get(url, timeout=30)
+                    response.raise_for_status()
+                    if len(response.content) < 500 or "tourney_id" not in response.text[:1000]:
+                        raise ValueError("Empty or unexpected CSV content")
+                    with open(fname, "w", encoding="utf-8") as f:
+                        f.write(response.text)
+                    print(f"Scaricato: {tour_label} {year}")
+                except Exception as exc:
+                    print(f"ERRORE download {tour_label} {year}: {exc}")
+                    if strict:
+                        missing.append(f"{tour_label} {year}")
+                    if not os.path.exists(fname):
                         continue
-                except Exception as e:
-                    print(f"Errore {tour_label} {year}: {e}")
-                    continue
-
             try:
                 df_year = pd.read_csv(fname, low_memory=False)
-                df_year["tour"]             = tour_label
+                required = {"tourney_date", "winner_id", "loser_id", "score"}
+                if not required.issubset(df_year.columns):
+                    raise ValueError(f"Missing columns: {required-set(df_year.columns)}")
+                df_year["tour"] = tour_label
                 df_year["use_for_training"] = use_for_training
                 dfs.append(df_year)
-            except Exception:
-                pass
-
+            except Exception as exc:
+                print(f"ERRORE CSV {fname}: {exc}")
+                if strict:
+                    missing.append(f"{tour_label} {year}")
+    if missing and strict:
+        raise RuntimeError("Incomplete historical source: " + ", ".join(sorted(set(missing))))
     if not dfs:
+        if strict:
+            raise RuntimeError("No historical CSVs available")
         return pd.DataFrame()
-
     df = pd.concat(dfs, ignore_index=True)
     df = df[df["score"].notna()]
     df = df[~df["score"].str.contains(r"W/O|RET|DEF|walkover", case=False, na=True)]
-    df["tourney_date"] = pd.to_datetime(df["tourney_date"].astype(str), format="%Y%m%d", errors="coerce")
-    df = df.sort_values("tourney_date").reset_index(drop=True)
-    return df
-
+    df["tourney_date"] = pd.to_datetime(
+        df["tourney_date"].astype(str), format="%Y%m%d", errors="coerce"
+    )
+    df = df.dropna(subset=["tourney_date", "winner_id", "loser_id"])
+    # Avoid same match being ingested twice from duplicated files.
+    df = df.drop_duplicates(
+        subset=["tour", "tourney_id", "tourney_date", "winner_id", "loser_id", "score"],
+        keep="last"
+    )
+    return df.sort_values("tourney_date").reset_index(drop=True)
 
 # ---------------------------------------------------------------------------
 # Parser score
