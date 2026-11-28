@@ -1,0 +1,40 @@
+{
+  "mode": "PROSPECTIVE_PAPER_ONLY",
+  "ledger_schema": 1,
+  "first_capture_run": "46088318688-1",
+  "source_model_version": "elo_g28_s36_w065_prior12_v1",
+  "model_git_revision": "41faffbec5b5a9a703adbb051feb75a544c57e42",
+  "prediction": {
+    "fixture_id": "186842",
+    "tour": "WTA",
+    "surface": "Hard",
+    "surface_source": "ESPN_tournament_heuristic",
+    "tournament": "IEB+ Argentina Open",
+    "p1": "Julia Riera",
+    "p2": "Veronika Erjavec",
+    "p1_historical_id": 220699,
+    "p2_historical_id": 220662,
+    "scheduled_start_utc": "2026-11-28T17:00:00+00:00",
+    "captured_at_utc": "2026-11-28T00:31:40.293969+00:00",
+    "history_last_date": "2026-11-22",
+    "model_id": "elo_g28_s36_w065_prior12_v1",
+    "p1_probability": 0.613595,
+    "picked_winner_name": "Julia Riera",
+    "picked_winner_probability": 0.613595,
+    "p1_prior_matches": 11,
+    "p2_prior_matches": 13,
+    "quality_flags": {
+      "surface_not_independently_verified": true,
+      "cold_start": false,
+      "market_quote_unavailable": true
+    },
+    "odds_decimal": null,
+    "market_status": "missing_eligible_h2h_quote",
+    "bookmaker": null,
+    "provider_last_update_utc": null,
+    "paper_only": true,
+    "wager_submitted": false
+  },
+  "settlement_status": "pending",
+  "no_real_wager": true
+}

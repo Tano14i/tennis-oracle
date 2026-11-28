@@ -1,0 +1,17 @@
+{
+  "settlement_schema": 1,
+  "source": "ESPN_SCOREBOARD_POST_WITH_WINNER_FLAG",
+  "source_match_id": "186831",
+  "tour": "WTA",
+  "fixture_date": "2026-11-27",
+  "matched_as_of_utc": "2026-11-28T00:31:46.006563+00:00",
+  "original_snapshot_utc": "2026-11-27T01:00:43.093751+00:00",
+  "model_id": "elo_g28_s36_w065_prior12_v1",
+  "no_real_wager": true,
+  "actual_winner": "Julia Riera",
+  "predicted_correct": true,
+  "picked_winner_probability": 0.509843,
+  "brier": 0.24025388464899997,
+  "quoted_paper_unit_net": null,
+  "quoted_decimal_odds": null
+}
